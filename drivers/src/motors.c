@@ -51,17 +51,18 @@ void motorsPlayTone(uint16_t frequency, uint16_t duration_msec);
 void motorsPlayMelody(uint16_t *notes);
 void motorsBeep(int id, bool enable, uint16_t frequency, uint16_t ratio);
 
-#ifdef PLATFORM_CF1
-#include "motors_def_cf1.c"
-#else
-#include "motors_def_cf2.c"
-#endif
+//#ifdef PLATFORM_CF1
+//#include "motors_def_cf1.c"
+//#else
+//#include "motors_def_cf2.c"
+//#endif
+#include "motors_def_blimp.c"
 
 const MotorPerifDef** motorMap;  /* Current map configuration */
 
-const uint32_t MOTORS[] = { MOTOR_M1, MOTOR_M2, MOTOR_M3, MOTOR_M4 };
+const uint32_t MOTORS[] = { MOTOR_M1, MOTOR_M2 };
 
-static const uint16_t testsound[NBR_OF_MOTORS] = {A4, A5, F5, D5 };
+static const uint16_t testsound[NBR_OF_MOTORS] = {A4, A5};
 
 static bool isInit = false;
 
@@ -148,6 +149,22 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
     TIM_CtrlPWMOutputs(motorMap[i]->tim, ENABLE);
   }
 
+  // 2016/01/19 Add additional output at IO3 for switching motor's direction --- test with LED
+  GPIO_StructInit(&GPIO_InitStructure);
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+  GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4;
+  GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+  // 2016/01/19 Add additional output at IO3 for switching motor's direction --- test with LED
+  GPIO_StructInit(&GPIO_InitStructure);
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+  GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
+  GPIO_Init(GPIOB, &GPIO_InitStructure);
+
   // Start the timers
   for (i = 0; i < NBR_OF_MOTORS; i++)
   {
@@ -203,6 +220,16 @@ bool motorsTest(void)
 #endif
     }
   }
+  // 2016/01/19 Test the switching output
+  GPIO_SetBits(GPIOB, GPIO_Pin_4);
+  vTaskDelay(M2T(2000));
+  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+  vTaskDelay(M2T(1000));
+
+  GPIO_SetBits(GPIOB, GPIO_Pin_5);
+  vTaskDelay(M2T(2000));
+  GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+  vTaskDelay(M2T(1000));
 
   return isInit;
 }
@@ -295,13 +322,9 @@ void motorsPlayTone(uint16_t frequency, uint16_t duration_msec)
 {
   motorsBeep(MOTOR_M1, true, frequency, (uint16_t)(MOTORS_TIM_BEEP_CLK_FREQ / frequency)/ 20);
   motorsBeep(MOTOR_M2, true, frequency, (uint16_t)(MOTORS_TIM_BEEP_CLK_FREQ / frequency)/ 20);
-  motorsBeep(MOTOR_M3, true, frequency, (uint16_t)(MOTORS_TIM_BEEP_CLK_FREQ / frequency)/ 20);
-  motorsBeep(MOTOR_M4, true, frequency, (uint16_t)(MOTORS_TIM_BEEP_CLK_FREQ / frequency)/ 20);
   vTaskDelay(M2T(duration_msec));
   motorsBeep(MOTOR_M1, false, frequency, 0);
   motorsBeep(MOTOR_M2, false, frequency, 0);
-  motorsBeep(MOTOR_M3, false, frequency, 0);
-  motorsBeep(MOTOR_M4, false, frequency, 0);
 }
 
 // Plays a melody from a note array

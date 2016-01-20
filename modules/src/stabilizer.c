@@ -139,10 +139,8 @@ int16_t  actuatorRoll;    // Actuator output roll compensation
 int16_t  actuatorPitch;   // Actuator output pitch compensation
 int16_t  actuatorYaw;     // Actuator output yaw compensation
 
-uint32_t motorPowerM1;  // Motor 1 power output (16bit value used: 0 - 65535)
-uint32_t motorPowerM2;  // Motor 2 power output (16bit value used: 0 - 65535)
-uint32_t motorPowerM3;  // Motor 3 power output (16bit value used: 0 - 65535)
-uint32_t motorPowerM4;  // Motor 4 power output (16bit value used: 0 - 65535)
+int32_t motorPowerM1;  // Motor 1 power output (32bit value used: -65535 - 65535)
+int32_t motorPowerM2;  // Motor 2 power output (32bit value used: -65535 - 65535)
 
 static bool isInit;
 
@@ -577,24 +575,39 @@ static void stabilizerYawModeUpdate(void)
 static void distributePower(const uint16_t thrust, const int16_t roll,
                             const int16_t pitch, const int16_t yaw)
 {
-#ifdef QUAD_FORMATION_X
-  int16_t r = roll >> 1;
-  int16_t p = pitch >> 1;
-  motorPowerM1 = limitThrust(thrust - r + p + yaw);
-  motorPowerM2 = limitThrust(thrust - r - p - yaw);
-  motorPowerM3 =  limitThrust(thrust + r - p + yaw);
-  motorPowerM4 =  limitThrust(thrust + r + p - yaw);
-#else // QUAD_FORMATION_NORMAL
-  motorPowerM1 = limitThrust(thrust + pitch + yaw);
-  motorPowerM2 = limitThrust(thrust - roll - yaw);
-  motorPowerM3 =  limitThrust(thrust - pitch + yaw);
-  motorPowerM4 =  limitThrust(thrust + roll - yaw);
-#endif
+//#ifdef QUAD_FORMATION_X
+//  int16_t r = roll >> 1;
+//  int16_t p = pitch >> 1;
+//  motorPowerM1 = limitThrust(thrust - r + p + yaw);
+//  motorPowerM2 = limitThrust(thrust - r - p - yaw);
+//  motorPowerM3 =  limitThrust(thrust + r - p + yaw);
+//  motorPowerM4 =  limitThrust(thrust + r + p - yaw);
+//#else // QUAD_FORMATION_NORMAL
+//  motorPowerM1 = limitThrust(thrust + pitch + yaw);
+//  motorPowerM2 = limitThrust(thrust - roll - yaw);
+//  motorPowerM3 =  limitThrust(thrust - pitch + yaw);
+//  motorPowerM4 =  limitThrust(thrust + roll - yaw);
+//#endif
 
-  motorsSetRatio(MOTOR_M1, motorPowerM1);
-  motorsSetRatio(MOTOR_M2, motorPowerM2);
-  motorsSetRatio(MOTOR_M3, motorPowerM3);
-  motorsSetRatio(MOTOR_M4, motorPowerM4);
+  if (motorPowerM1 < 0){
+	  // This is for switching relay to reverse the current
+	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
+  }
+  else{
+	  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+  }
+
+  if (motorPowerM2 < 0){
+  	// This is for switching relay to reverse the current
+  	GPIO_SetBits(GPIOB, GPIO_Pin_5);
+  }
+  else{
+    GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+  }
+  motorsSetRatio(MOTOR_M1, abs(motorPowerM1));
+  motorsSetRatio(MOTOR_M2, abs(motorPowerM2));
+//  motorsSetRatio(MOTOR_M3, motorPowerM3);
+//  motorsSetRatio(MOTOR_M4, motorPowerM4);
 }
 
 static uint16_t limitThrust(int32_t value)
@@ -663,10 +676,8 @@ LOG_ADD(LOG_FLOAT, z, &mag.z)
 LOG_GROUP_STOP(mag)
 
 LOG_GROUP_START(motor)
-LOG_ADD(LOG_INT32, m4, &motorPowerM4)
 LOG_ADD(LOG_INT32, m1, &motorPowerM1)
 LOG_ADD(LOG_INT32, m2, &motorPowerM2)
-LOG_ADD(LOG_INT32, m3, &motorPowerM3)
 LOG_GROUP_STOP(motor)
 
 // LOG altitude hold PID controller states
@@ -735,3 +746,9 @@ PARAM_ADD(PARAM_FLOAT, Thresh, &autoTOThresh)
 PARAM_ADD(PARAM_FLOAT, Alpha, &autoTOAlpha)
 PARAM_GROUP_STOP(autoTO)
 #endif
+
+// Params for motor thrust
+PARAM_GROUP_START(motors)
+PARAM_ADD(PARAM_INT32, motorPowerM1, &motorPowerM1)
+PARAM_ADD(PARAM_INT32, motorPowerM2, &motorPowerM2)
+PARAM_GROUP_STOP(motors)
