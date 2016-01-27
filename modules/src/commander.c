@@ -32,14 +32,14 @@
 #include "param.h"
 
 #define MIN_THRUST  1000
-#define MAX_THRUST  60000
+#define MAX_THRUST  65535
 
 struct CommanderCrtpValues
 {
   float roll;
   float pitch;
   float yaw;
-  uint16_t thrust;
+  int32_t thrust;
 } __attribute__((packed));
 
 static struct CommanderCrtpValues targetVal[2];
@@ -178,10 +178,10 @@ void commanderGetRPYType(RPYType* rollType, RPYType* pitchType, RPYType* yawType
   *yawType   = stabilizationModeYaw;
 }
 
-void commanderGetThrust(uint16_t* thrust)
+void commanderGetThrust(int32_t* thrust)
 {
   int usedSide = side;
-  uint16_t rawThrust = targetVal[usedSide].thrust;
+  int32_t rawThrust = targetVal[usedSide].thrust;
 
   if (thrustLocked)
   {
@@ -189,7 +189,7 @@ void commanderGetThrust(uint16_t* thrust)
   }
   else
   {
-    if (rawThrust > MIN_THRUST)
+    if (abs(rawThrust) > MIN_THRUST)
     {
       *thrust = rawThrust;
     }
@@ -198,9 +198,9 @@ void commanderGetThrust(uint16_t* thrust)
       *thrust = 0;
     }
 
-    if (rawThrust > MAX_THRUST)
+    if (abs(rawThrust) > MAX_THRUST)
     {
-      *thrust = MAX_THRUST;
+      *thrust = (rawThrust/abs(rawThrust))*MAX_THRUST;
     }
   }
 

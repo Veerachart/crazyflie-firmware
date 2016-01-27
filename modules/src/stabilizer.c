@@ -134,13 +134,16 @@ static float autoTOThresh          = 0.97f; // Threshold for when to deactivate 
 
 static float carefreeFrontAngle = 0; // carefree front angle that is set
 
-uint16_t actuatorThrust;  // Actuator output for thrust base
+int32_t actuatorThrust;  // Actuator output for thrust base
 int16_t  actuatorRoll;    // Actuator output roll compensation
 int16_t  actuatorPitch;   // Actuator output pitch compensation
 int16_t  actuatorYaw;     // Actuator output yaw compensation
 
 int32_t motorPowerM1;  // Motor 1 power output (32bit value used: -65535 - 65535)
 int32_t motorPowerM2;  // Motor 2 power output (32bit value used: -65535 - 65535)
+
+int32_t motorPowerM1_old = 0;
+int32_t motorPowerM2_old = 0;
 
 static bool isInit;
 
@@ -149,9 +152,9 @@ static void stabilizerAltHoldUpdate(void);
 static void stabilizerRotateYaw(float yawRad);
 static void stabilizerRotateYawCarefree(bool reset);
 static void stabilizerYawModeUpdate(void);
-static void distributePower(const uint16_t thrust, const int16_t roll,
+static void distributePower(const int32_t thrust, const int16_t roll,
                             const int16_t pitch, const int16_t yaw);
-static uint16_t limitThrust(int32_t value);
+static int32_t limitThrust(int32_t value);
 static void stabilizerTask(void* param);
 static float constrain(float value, const float minVal, const float maxVal);
 static float deadband(float value, const float threshold);
@@ -280,12 +283,12 @@ static void stabilizerTask(void* param)
         // Estimate speed from acc (drifts)
         vSpeed += deadband(accWZ, vAccDeadband) * FUSION_UPDATE_DT;
 
-        // Adjust yaw if configured to do so
-        stabilizerYawModeUpdate();
-
-        controllerCorrectAttitudePID(eulerRollActual, eulerPitchActual, eulerYawActual,
-                                     eulerRollDesired, eulerPitchDesired, -eulerYawDesired,
-                                     &rollRateDesired, &pitchRateDesired, &yawRateDesired);
+//        // Adjust yaw if configured to do so
+//        stabilizerYawModeUpdate();
+//
+//        controllerCorrectAttitudePID(eulerRollActual, eulerPitchActual, eulerYawActual,
+//                                     eulerRollDesired, eulerPitchDesired, -eulerYawDesired,
+//                                     &rollRateDesired, &pitchRateDesired, &yawRateDesired);
         attitudeCounter = 0;
 
         /* Call out after performing attitude updates, if any functions would like to use the calculated values. */
@@ -299,25 +302,26 @@ static void stabilizerTask(void* param)
         altHoldCounter = 0;
       }
 
-      if (rollType == RATE)
-      {
-        rollRateDesired = eulerRollDesired;
-      }
-      if (pitchType == RATE)
-      {
-        pitchRateDesired = eulerPitchDesired;
-      }
-
-      // TODO: Investigate possibility to subtract gyro drift.
-      controllerCorrectRatePID(gyro.x, -gyro.y, gyro.z,
-                               rollRateDesired, pitchRateDesired, yawRateDesired);
-
-      controllerGetActuatorOutput(&actuatorRoll, &actuatorPitch, &actuatorYaw);
+//      if (rollType == RATE)
+//      {
+//        rollRateDesired = eulerRollDesired;
+//      }
+//      if (pitchType == RATE)
+//      {
+//        pitchRateDesired = eulerPitchDesired;
+//      }
+//
+//      // TODO: Investigate possibility to subtract gyro drift.
+//      controllerCorrectRatePID(gyro.x, -gyro.y, gyro.z,
+//                               rollRateDesired, pitchRateDesired, yawRateDesired);
+//
+//      controllerGetActuatorOutput(&actuatorRoll, &actuatorPitch, &actuatorYaw);
 
       if (!altHold || !imuHasBarometer())
       {
         // Use thrust from controller if not in altitude hold mode
         commanderGetThrust(&actuatorThrust);
+        actuatorYaw = eulerYawDesired;
       }
       else
       {
@@ -328,7 +332,7 @@ static void stabilizerTask(void* param)
       /* Call out before performing thrust updates, if any functions would like to influence the thrust. */
       stabilizerPreThrustUpdateCallOut();
 
-      if (actuatorThrust > 0)
+      if (actuatorThrust != 0)
       {
 #if defined(TUNE_ROLL)
         distributePower(actuatorThrust, actuatorRoll, 0, 0);
@@ -572,7 +576,7 @@ static void stabilizerYawModeUpdate(void)
 }
 #endif
 
-static void distributePower(const uint16_t thrust, const int16_t roll,
+static void distributePower(const int32_t thrust, const int16_t roll,
                             const int16_t pitch, const int16_t yaw)
 {
 //#ifdef QUAD_FORMATION_X
@@ -589,39 +593,46 @@ static void distributePower(const uint16_t thrust, const int16_t roll,
 //  motorPowerM4 =  limitThrust(thrust + roll - yaw);
 //#endif
 
-  if (motorPowerM1 < 0){
-	  // This is for switching relay to reverse the current
+  motorPowerM1 = limitThrust(thrust + (yaw >> 1));
+  motorPowerM2 = limitThrust(thrust - (yaw >> 1));
+
+  if ((motorPowerM1 >= 0) != (motorPowerM1_old >= 0)){
+    // Different sign ==> trigger the relay
+	  motorsSetRatio(MOTOR_M1, 0);				// Stop motor first
+	  vTaskDelay(M2T(10));						// 10 ms for stopping
 	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
-  }
-  else{
+	  vTaskDelay(M2T(10));						// 10 ms for triggering relay
 	  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
   }
-
-  if (motorPowerM2 < 0){
-  	// This is for switching relay to reverse the current
-  	GPIO_SetBits(GPIOB, GPIO_Pin_5);
-  }
-  else{
+  if ((motorPowerM2 >= 0) != (motorPowerM2_old >= 0)){
+    // Different sign ==> trigger the relay
+    motorsSetRatio(MOTOR_M2, 0);				// Stop motor first
+    vTaskDelay(M2T(10));						// 10 ms for stopping
+    GPIO_SetBits(GPIOB, GPIO_Pin_5);
+    vTaskDelay(M2T(10));						// 10 ms for triggering relay
     GPIO_ResetBits(GPIOB, GPIO_Pin_5);
   }
   motorsSetRatio(MOTOR_M1, abs(motorPowerM1));
   motorsSetRatio(MOTOR_M2, abs(motorPowerM2));
 //  motorsSetRatio(MOTOR_M3, motorPowerM3);
 //  motorsSetRatio(MOTOR_M4, motorPowerM4);
+
+  motorPowerM1_old = motorPowerM1;
+  motorPowerM2_old = motorPowerM2;
 }
 
-static uint16_t limitThrust(int32_t value)
+static int32_t limitThrust(int32_t value)
 {
   if(value > UINT16_MAX)
   {
     value = UINT16_MAX;
   }
-  else if(value < 0)
+  else if(value < -UINT16_MAX)
   {
-    value = 0;
+    value = -UINT16_MAX;
   }
 
-  return (uint16_t)value;
+  return (int32_t)value;
 }
 
 // Constrain value between min and max
@@ -675,10 +686,10 @@ LOG_ADD(LOG_FLOAT, y, &mag.y)
 LOG_ADD(LOG_FLOAT, z, &mag.z)
 LOG_GROUP_STOP(mag)
 
-LOG_GROUP_START(motor)
-LOG_ADD(LOG_INT32, m1, &motorPowerM1)
-LOG_ADD(LOG_INT32, m2, &motorPowerM2)
-LOG_GROUP_STOP(motor)
+//LOG_GROUP_START(motor)
+//LOG_ADD(LOG_INT32, m1, &motorPowerM1)
+//LOG_ADD(LOG_INT32, m2, &motorPowerM2)
+//LOG_GROUP_STOP(motor)
 
 // LOG altitude hold PID controller states
 LOG_GROUP_START(vpid)
