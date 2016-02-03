@@ -149,7 +149,22 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
     TIM_CtrlPWMOutputs(motorMap[i]->tim, ENABLE);
   }
 
-  // 2016/01/19 Add additional output at IO3 for switching motor's direction --- test with LED
+  // 2016/02/03 Add additional output at IO1 and IO2 for switching motor's direction --- M1
+  GPIO_StructInit(&GPIO_InitStructure);
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+  GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;
+  GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+  GPIO_StructInit(&GPIO_InitStructure);
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+  GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
+  GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+  // 2016/02/03 Add additional output at IO3 and IO4 for switching motor's direction --- M2
   GPIO_StructInit(&GPIO_InitStructure);
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
@@ -157,13 +172,12 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4;
   GPIO_Init(GPIOB, &GPIO_InitStructure);
 
-  // 2016/01/19 Add additional output at IO3 for switching motor's direction --- test with LED
   GPIO_StructInit(&GPIO_InitStructure);
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd  = GPIO_PuPd_NOPULL;
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;
+  GPIO_Init(GPIOC, &GPIO_InitStructure);
 
   // Start the timers
   for (i = 0; i < NBR_OF_MOTORS; i++)
@@ -220,16 +234,6 @@ bool motorsTest(void)
 #endif
     }
   }
-  // 2016/01/19 Test the switching output
-  GPIO_SetBits(GPIOB, GPIO_Pin_4);
-  vTaskDelay(M2T(2000));
-  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
-  vTaskDelay(M2T(1000));
-
-  GPIO_SetBits(GPIOB, GPIO_Pin_5);
-  vTaskDelay(M2T(2000));
-  GPIO_ResetBits(GPIOB, GPIO_Pin_5);
-  vTaskDelay(M2T(1000));
 
   return isInit;
 }

@@ -88,11 +88,11 @@ void controllerCorrectRatePID(
        float rollRateActual, float pitchRateActual, float yawRateActual,
        float rollRateDesired, float pitchRateDesired, float yawRateDesired)
 {
-  pidSetDesired(&pidRollRate, rollRateDesired);
-  rollOutput = saturateSignedInt16(pidUpdate(&pidRollRate, rollRateActual, true));
-
-  pidSetDesired(&pidPitchRate, pitchRateDesired);
-  pitchOutput = saturateSignedInt16(pidUpdate(&pidPitchRate, pitchRateActual, true));
+//  pidSetDesired(&pidRollRate, rollRateDesired);
+//  rollOutput = saturateSignedInt16(pidUpdate(&pidRollRate, rollRateActual, true));
+//
+//  pidSetDesired(&pidPitchRate, pitchRateDesired);
+//  pitchOutput = saturateSignedInt16(pidUpdate(&pidPitchRate, pitchRateActual, true));
 
   pidSetDesired(&pidYawRate, yawRateDesired);
   yawOutput = saturateSignedInt16(pidUpdate(&pidYawRate, yawRateActual, true));
@@ -103,12 +103,12 @@ void controllerCorrectAttitudePID(
        float eulerRollDesired, float eulerPitchDesired, float eulerYawDesired,
        float* rollRateDesired, float* pitchRateDesired, float* yawRateDesired)
 {
-  pidSetDesired(&pidRoll, eulerRollDesired);
-  *rollRateDesired = pidUpdate(&pidRoll, eulerRollActual, true);
-
-  // Update PID for pitch axis
-  pidSetDesired(&pidPitch, eulerPitchDesired);
-  *pitchRateDesired = pidUpdate(&pidPitch, eulerPitchActual, true);
+//  pidSetDesired(&pidRoll, eulerRollDesired);
+//  *rollRateDesired = pidUpdate(&pidRoll, eulerRollActual, true);
+//
+//  // Update PID for pitch axis
+//  pidSetDesired(&pidPitch, eulerPitchDesired);
+//  *pitchRateDesired = pidUpdate(&pidPitch, eulerPitchActual, true);
 
   // Update PID for yaw axis
   float yawError;

@@ -285,10 +285,10 @@ static void stabilizerTask(void* param)
 
 //        // Adjust yaw if configured to do so
 //        stabilizerYawModeUpdate();
-//
-//        controllerCorrectAttitudePID(eulerRollActual, eulerPitchActual, eulerYawActual,
-//                                     eulerRollDesired, eulerPitchDesired, -eulerYawDesired,
-//                                     &rollRateDesired, &pitchRateDesired, &yawRateDesired);
+
+        controllerCorrectAttitudePID(eulerRollActual, eulerPitchActual, eulerYawActual,
+                                     eulerRollDesired, eulerPitchDesired, -eulerYawDesired,
+                                     &rollRateDesired, &pitchRateDesired, &yawRateDesired);
         attitudeCounter = 0;
 
         /* Call out after performing attitude updates, if any functions would like to use the calculated values. */
@@ -311,17 +311,16 @@ static void stabilizerTask(void* param)
 //        pitchRateDesired = eulerPitchDesired;
 //      }
 //
-//      // TODO: Investigate possibility to subtract gyro drift.
-//      controllerCorrectRatePID(gyro.x, -gyro.y, gyro.z,
-//                               rollRateDesired, pitchRateDesired, yawRateDesired);
-//
-//      controllerGetActuatorOutput(&actuatorRoll, &actuatorPitch, &actuatorYaw);
+      // TODO: Investigate possibility to subtract gyro drift.
+      controllerCorrectRatePID(gyro.x, -gyro.y, gyro.z,
+                               rollRateDesired, pitchRateDesired, yawRateDesired);
+
+      controllerGetActuatorOutput(&actuatorRoll, &actuatorPitch, &actuatorYaw);
 
       if (!altHold || !imuHasBarometer())
       {
         // Use thrust from controller if not in altitude hold mode
         commanderGetThrust(&actuatorThrust);
-        actuatorYaw = eulerYawDesired;
       }
       else
       {
@@ -332,8 +331,7 @@ static void stabilizerTask(void* param)
       /* Call out before performing thrust updates, if any functions would like to influence the thrust. */
       stabilizerPreThrustUpdateCallOut();
 
-      if (actuatorThrust != 0)
-      {
+      if ((actuatorThrust != 0 || abs(actuatorYaw) > 200) && (eulerRollDesired != 0 || eulerPitchDesired != 0 || actuatorThrust != 0)){		// No input command, so no drive
 #if defined(TUNE_ROLL)
         distributePower(actuatorThrust, actuatorRoll, 0, 0);
 #elif defined(TUNE_PITCH)
@@ -593,24 +591,42 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 //  motorPowerM4 =  limitThrust(thrust + roll - yaw);
 //#endif
 
-  motorPowerM1 = limitThrust(thrust + (yaw >> 1));
-  motorPowerM2 = limitThrust(thrust - (yaw >> 1));
+  motorPowerM1 = limitThrust(thrust - (yaw>>1));
+  motorPowerM2 = limitThrust(thrust + (yaw>>1));
 
   if ((motorPowerM1 >= 0) != (motorPowerM1_old >= 0)){
     // Different sign ==> trigger the relay
-	  motorsSetRatio(MOTOR_M1, 0);				// Stop motor first
-	  vTaskDelay(M2T(10));						// 10 ms for stopping
-	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
+	motorsSetRatio(MOTOR_M1, 0);				// Stop motor first
+	vTaskDelay(M2T(10));						// 10 ms for stopping
+    if (motorPowerM1 >= 0){
+      // Reset -- IO1 off IO2 on
+      GPIO_SetBits(GPIOB, GPIO_Pin_5);
 	  vTaskDelay(M2T(10));						// 10 ms for triggering relay
-	  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+    }
+    else{
+      // Set -- IO1 on IO2 off
+      GPIO_SetBits(GPIOB, GPIO_Pin_8);
+      vTaskDelay(M2T(10));						// 10 ms for triggering relay
+    }
+    GPIO_ResetBits(GPIOB, GPIO_Pin_8);
+    GPIO_ResetBits(GPIOB, GPIO_Pin_5);
   }
   if ((motorPowerM2 >= 0) != (motorPowerM2_old >= 0)){
     // Different sign ==> trigger the relay
-    motorsSetRatio(MOTOR_M2, 0);				// Stop motor first
-    vTaskDelay(M2T(10));						// 10 ms for stopping
-    GPIO_SetBits(GPIOB, GPIO_Pin_5);
-    vTaskDelay(M2T(10));						// 10 ms for triggering relay
-    GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+	motorsSetRatio(MOTOR_M2, 0);				// Stop motor first
+	vTaskDelay(M2T(10));						// 10 ms for stopping
+	if (motorPowerM2 >= 0){
+	  // Reset -- IO3 off IO4 on
+	  GPIO_SetBits(GPIOC, GPIO_Pin_12);
+	  vTaskDelay(M2T(10));						// 10 ms for triggering relay
+	}
+	else{
+	  // Set -- IO3 on IO4 off
+	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
+	  vTaskDelay(M2T(10));						// 10 ms for triggering relay
+	}
+	GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+	GPIO_ResetBits(GPIOC, GPIO_Pin_12);
   }
   motorsSetRatio(MOTOR_M1, abs(motorPowerM1));
   motorsSetRatio(MOTOR_M2, abs(motorPowerM2));
