@@ -331,7 +331,7 @@ static void stabilizerTask(void* param)
       /* Call out before performing thrust updates, if any functions would like to influence the thrust. */
       stabilizerPreThrustUpdateCallOut();
 
-      if ((actuatorThrust != 0 || abs(actuatorYaw) > 200) && (eulerRollDesired != 0 || eulerPitchDesired != 0 || actuatorThrust != 0)){		// No input command, so no drive
+      if (actuatorThrust != 0 || abs(actuatorYaw) > 200 || ((eulerRollDesired != 0 || eulerPitchDesired != 0) && actuatorThrust != 0)){		// No input command, so no drive
 #if defined(TUNE_ROLL)
         distributePower(actuatorThrust, actuatorRoll, 0, 0);
 #elif defined(TUNE_PITCH)
