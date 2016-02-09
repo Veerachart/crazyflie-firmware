@@ -60,7 +60,7 @@ void motorsBeep(int id, bool enable, uint16_t frequency, uint16_t ratio);
 
 const MotorPerifDef** motorMap;  /* Current map configuration */
 
-const uint32_t MOTORS[] = { MOTOR_M1, MOTOR_M2 };
+const uint32_t MOTORS[] = { MOTOR_M1, MOTOR_M2, MOTOR_SERVO };
 
 static const uint16_t testsound[NBR_OF_MOTORS] = {A4, A5};
 
@@ -75,7 +75,7 @@ static uint16_t motorsBLConvBitsTo16(uint16_t bits)
 
 static uint16_t motorsBLConv16ToBits(uint16_t bits)
 {
-  return (MOTORS_BL_PWM_CNT_FOR_1MS + ((bits * MOTORS_BL_PWM_CNT_FOR_1MS) / 0xFFFF));
+  return (MOTORS_BL_PWM_CNT_FOR_1MS*0.725 + ((bits * MOTORS_BL_PWM_CNT_FOR_1MS * 0.975) / 0xFFFF));
 }
 
 static uint16_t motorsConvBitsTo16(uint16_t bits)
@@ -234,6 +234,15 @@ bool motorsTest(void)
 #endif
     }
   }
+//  motorMap[2]->setCompare(motorMap[2]->tim, (uint32_t) (0.5*MOTORS_BL_PWM_CNT_FOR_1MS));
+//  vTaskDelay(M2T(2000));
+//  motorMap[2]->setCompare(motorMap[2]->tim, (uint32_t) (0.6*MOTORS_BL_PWM_CNT_FOR_1MS));
+//  vTaskDelay(M2T(2000));
+//  motorMap[2]->setCompare(motorMap[2]->tim, (uint32_t) (0.7*MOTORS_BL_PWM_CNT_FOR_1MS));
+//  vTaskDelay(M2T(2000));
+  motorsSetRatio(MOTORS[2],0);
+  vTaskDelay(M2T(2000));
+  motorsSetRatio(MOTORS[2],65535);
 
   return isInit;
 }

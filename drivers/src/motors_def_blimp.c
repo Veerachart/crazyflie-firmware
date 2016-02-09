@@ -231,7 +231,7 @@ static const MotorPerifDef DECK_TX2_TIM5 =
     .gpioPort      = GPIOA,
     .gpioPin       = GPIO_Pin_2,
     .gpioPinSource = GPIO_PinSource2,
-    .gpioOType     = GPIO_OType_OD,
+    .gpioOType     = GPIO_OType_PP,
     .gpioAF        = GPIO_AF_TIM5,
     .timPerif      = RCC_APB1Periph_TIM5,
     .tim           = TIM5,
@@ -427,7 +427,8 @@ static const MotorPerifDef DECK_MOSI =
 const MotorPerifDef* motorMapDefaultBrushed[NBR_OF_MOTORS] =
 {
   &CONN_M1,
-  &CONN_M2
+  &CONN_M2,
+  &DECK_TX2_TIM5
 };
 
 /**

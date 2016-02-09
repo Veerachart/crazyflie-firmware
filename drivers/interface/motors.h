@@ -86,7 +86,7 @@
  * base as for the regular PWM driver. This means it will be a PWM with a period of the update rate configured to be high
  * only in the 1-2 ms range.
  */
-  #define BLMC_PERIOD 0.0025   // 2.5ms = 400Hz
+  #define BLMC_PERIOD 0.020   // 20ms = 50Hz
   #define MOTORS_BL_PWM_PRESCALE_RAW   (uint32_t)((TIM_CLOCK_HZ/0xFFFF) * BLMC_PERIOD + 1) // +1 is to not end up above 0xFFFF in the end
   #define MOTORS_BL_PWM_CNT_FOR_PERIOD (uint32_t)(TIM_CLOCK_HZ * BLMC_PERIOD / MOTORS_BL_PWM_PRESCALE_RAW)
   #define MOTORS_BL_PWM_CNT_FOR_1MS    (uint32_t)(TIM_CLOCK_HZ * 0.001 / MOTORS_BL_PWM_PRESCALE_RAW)
@@ -94,10 +94,11 @@
   #define MOTORS_BL_PWM_PRESCALE       (uint16_t)(MOTORS_BL_PWM_PRESCALE_RAW - 1)
   #define MOTORS_BL_POLARITY           TIM_OCPolarity_Low
 
-#define NBR_OF_MOTORS 2
+#define NBR_OF_MOTORS 3
 // Motors IDs define
 #define MOTOR_M1  0
 #define MOTOR_M2  1
+#define MOTOR_SERVO	2
 
 // Test defines
 #define MOTORS_TEST_RATIO         (uint16_t)(0.2*(1<<16))
