@@ -29,6 +29,28 @@
 static const MotorPerifDef CONN_M1 =
 {
 	.drvType       = BRUSHED,
+	.gpioPerif     = RCC_AHB1Periph_GPIOA,
+	.gpioPort      = GPIOA,
+	.gpioPin       = GPIO_Pin_1,
+	.gpioPinSource = GPIO_PinSource1,
+	.gpioOType     = GPIO_OType_PP,
+	.gpioAF        = GPIO_AF_TIM2,
+	.timPerif      = RCC_APB1Periph_TIM2,
+	.tim           = TIM2,
+	.timPolarity   = TIM_OCPolarity_High,
+	.timDbgStop    = DBGMCU_TIM2_STOP,
+	.timPeriod     = MOTORS_PWM_PERIOD,
+	.timPrescaler  = MOTORS_PWM_PRESCALE,
+	.setCompare    = TIM_SetCompare2,
+	.getCompare    = TIM_GetCapture2,
+	.ocInit        = TIM_OC2Init,
+	.preloadConfig = TIM_OC2PreloadConfig,
+};
+
+// Connector M2, PB11, TIM2_CH4   Connected to M3 slot on the board
+static const MotorPerifDef CONN_M2 =
+{
+	.drvType       = BRUSHED,
 	.gpioPerif     = RCC_AHB1Periph_GPIOB,
 	.gpioPort      = GPIOB,
 	.gpioPin       = GPIO_Pin_11,
@@ -45,28 +67,6 @@ static const MotorPerifDef CONN_M1 =
 	.getCompare    = TIM_GetCapture4,
 	.ocInit        = TIM_OC4Init,
 	.preloadConfig = TIM_OC4PreloadConfig,
-};
-
-// Connector M2, PB11, TIM2_CH4   Connected to M3 slot on the board
-static const MotorPerifDef CONN_M2 =
-{
-	.drvType       = BRUSHED,
-	.gpioPerif     = RCC_AHB1Periph_GPIOA,
-	.gpioPort      = GPIOA,
-	.gpioPin       = GPIO_Pin_15,
-	.gpioPinSource = GPIO_PinSource15,
-	.gpioOType     = GPIO_OType_PP,
-	.gpioAF        = GPIO_AF_TIM2,
-	.timPerif      = RCC_APB1Periph_TIM2,
-	.tim           = TIM2,
-	.timPolarity   = TIM_OCPolarity_High,
-	.timDbgStop    = DBGMCU_TIM2_STOP,
-	.timPeriod     = MOTORS_PWM_PERIOD,
-	.timPrescaler  = MOTORS_PWM_PRESCALE,
-	.setCompare    = TIM_SetCompare1,
-	.getCompare    = TIM_GetCapture1,
-	.ocInit        = TIM_OC1Init,
-	.preloadConfig = TIM_OC1PreloadConfig,
 };
 //
 //// Connector M3, PA15, TIM2_CH1

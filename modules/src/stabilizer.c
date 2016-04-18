@@ -153,7 +153,7 @@ static void stabilizerRotateYaw(float yawRad);
 static void stabilizerRotateYawCarefree(bool reset);
 static void stabilizerYawModeUpdate(void);
 static void distributePower(const int32_t thrust, const int16_t roll,
-                            const int16_t pitch, const int16_t yaw);
+                            const int32_t pitch, const int16_t yaw);
 static int32_t limitThrust(int32_t value);
 static void stabilizerTask(void* param);
 static float constrain(float value, const float minVal, const float maxVal);
@@ -339,7 +339,7 @@ static void stabilizerTask(void* param)
 #elif defined(TUNE_YAW)
         distributePower(actuatorThrust, 0, 0, -actuatorYaw);
 #else
-        distributePower(actuatorThrust, actuatorRoll, (int16_t) (eulerPitchDesired*500), -actuatorYaw);
+        distributePower(actuatorThrust, actuatorRoll, (int32_t) (eulerPitchDesired*600), -actuatorYaw);
 #endif
       }
       else
@@ -575,7 +575,7 @@ static void stabilizerYawModeUpdate(void)
 #endif
 
 static void distributePower(const int32_t thrust, const int16_t roll,
-                            const int16_t pitch, const int16_t yaw)
+                            const int32_t pitch, const int16_t yaw)
 {
 //#ifdef QUAD_FORMATION_X
 //  int16_t r = roll >> 1;
@@ -594,13 +594,15 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 	motorsSetRatio(MOTOR_SERVO, 65535);
 	motorPowerM1 = limitThrust(-pitch);
 	motorPowerM2 = limitThrust(-pitch);
-	vTaskDelay(M2T(100));						// Wait for servo to rotate
+	vTaskDelay(M2T(20));						// Wait for servo to rotate
   }
   else{
 	motorsSetRatio(MOTOR_SERVO, 0);
-	motorPowerM1 = limitThrust(thrust - (yaw>>1));
-	motorPowerM2 = limitThrust(thrust + (yaw>>1));
-	vTaskDelay(M2T(100));						// Wait for servo to rotate
+	motorPowerM1 = limitThrust(thrust - (yaw));
+	motorPowerM2 = limitThrust(thrust + (yaw));
+//	motorPowerM1 = limitThrust(thrust);
+//	motorPowerM2 = limitThrust(thrust);
+	vTaskDelay(M2T(20));						// Wait for servo to rotate
   }
 
   if ((motorPowerM1 >= 0) != (motorPowerM1_old >= 0)){
@@ -609,12 +611,12 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 	vTaskDelay(M2T(10));						// 10 ms for stopping
 	if (motorPowerM1 >= 0){
 	// Reset -- IO1 off IO2 on
-	GPIO_SetBits(GPIOB, GPIO_Pin_5);
+	GPIO_SetBits(GPIOB, GPIO_Pin_8);
 	vTaskDelay(M2T(10));						// 10 ms for triggering relay
 	}
 	else{
 	// Set -- IO1 on IO2 off
-	GPIO_SetBits(GPIOB, GPIO_Pin_8);
+	GPIO_SetBits(GPIOB, GPIO_Pin_5);
 	vTaskDelay(M2T(10));						// 10 ms for triggering relay
 	}
 	GPIO_ResetBits(GPIOB, GPIO_Pin_8);
@@ -711,10 +713,10 @@ LOG_ADD(LOG_FLOAT, y, &mag.y)
 LOG_ADD(LOG_FLOAT, z, &mag.z)
 LOG_GROUP_STOP(mag)
 
-//LOG_GROUP_START(motor)
-//LOG_ADD(LOG_INT32, m1, &motorPowerM1)
-//LOG_ADD(LOG_INT32, m2, &motorPowerM2)
-//LOG_GROUP_STOP(motor)
+LOG_GROUP_START(motor)
+LOG_ADD(LOG_INT32, m1, &motorPowerM1)
+LOG_ADD(LOG_INT32, m2, &motorPowerM2)
+LOG_GROUP_STOP(motor)
 
 // LOG altitude hold PID controller states
 LOG_GROUP_START(vpid)
@@ -783,8 +785,8 @@ PARAM_ADD(PARAM_FLOAT, Alpha, &autoTOAlpha)
 PARAM_GROUP_STOP(autoTO)
 #endif
 
-// Params for motor thrust
-PARAM_GROUP_START(motors)
-PARAM_ADD(PARAM_INT32, motorPowerM1, &motorPowerM1)
-PARAM_ADD(PARAM_INT32, motorPowerM2, &motorPowerM2)
-PARAM_GROUP_STOP(motors)
+//// Params for motor thrust
+//PARAM_GROUP_START(motors)
+//PARAM_ADD(PARAM_INT32, motorPowerM1, &motorPowerM1)
+//PARAM_ADD(PARAM_INT32, motorPowerM2, &motorPowerM2)
+//PARAM_GROUP_STOP(motors)
