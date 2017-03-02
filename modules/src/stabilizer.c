@@ -64,6 +64,9 @@
 #define ALTHOLD_UPDATE_RATE_DIVIDER  5 // 500hz/5 = 100hz for barometer measurements
 #define ALTHOLD_UPDATE_DT  (float)(1.0 / (IMU_UPDATE_FREQ / ALTHOLD_UPDATE_RATE_DIVIDER))   // 500hz
 
+// Threshold value for zero
+#define THRESHOLD 20
+
 static Axis3f gyro; // Gyro axis data in deg/s
 static Axis3f acc;  // Accelerometer axis data in mG
 static Axis3f mag;  // Magnetometer axis data in testla
@@ -144,6 +147,11 @@ int32_t motorPowerM2;  // Motor 2 power output (32bit value used: -65535 - 65535
 
 int32_t motorPowerM1_old = 0;
 int32_t motorPowerM2_old = 0;
+
+float motorLogM1 = 0.0;
+float motorLogM2 = 0.0;
+
+float angle = 0.0;
 
 static bool isInit;
 
@@ -269,7 +277,7 @@ static void stabilizerTask(void* param)
         while (yawRateAngle < -180.0)
           yawRateAngle += 360.0;
 
-        eulerYawDesired = -yawRateAngle;
+        eulerYawDesired = yawRateAngle;
       }
 
       // 250HZ
@@ -283,11 +291,11 @@ static void stabilizerTask(void* param)
         // Estimate speed from acc (drifts)
         vSpeed += deadband(accWZ, vAccDeadband) * FUSION_UPDATE_DT;
 
-//        // Adjust yaw if configured to do so
-//        stabilizerYawModeUpdate();
+        // Adjust yaw if configured to do so
+        stabilizerYawModeUpdate();
 
         controllerCorrectAttitudePID(eulerRollActual, eulerPitchActual, eulerYawActual,
-                                     eulerRollDesired, eulerPitchDesired, -eulerYawDesired,
+                                     eulerRollDesired, eulerPitchDesired, eulerYawDesired,
                                      &rollRateDesired, &pitchRateDesired, &yawRateDesired);
         attitudeCounter = 0;
 
@@ -302,15 +310,15 @@ static void stabilizerTask(void* param)
         altHoldCounter = 0;
       }
 
-//      if (rollType == RATE)
-//      {
-//        rollRateDesired = eulerRollDesired;
-//      }
-//      if (pitchType == RATE)
-//      {
-//        pitchRateDesired = eulerPitchDesired;
-//      }
-//
+      if (rollType == RATE)
+      {
+        rollRateDesired = eulerRollDesired;
+      }
+      if (pitchType == RATE)
+      {
+        pitchRateDesired = eulerPitchDesired;
+      }
+
       // TODO: Investigate possibility to subtract gyro drift.
       controllerCorrectRatePID(gyro.x, -gyro.y, gyro.z,
                                rollRateDesired, pitchRateDesired, yawRateDesired);
@@ -331,7 +339,7 @@ static void stabilizerTask(void* param)
       /* Call out before performing thrust updates, if any functions would like to influence the thrust. */
       stabilizerPreThrustUpdateCallOut();
 
-      if (actuatorThrust != 0 || abs(actuatorYaw) > 200 || eulerPitchDesired != 0){		// No input command, so no drive
+      if (actuatorThrust != 0 || actuatorYaw != 0 || eulerPitchDesired != 0){		// No input command, so no drive
 #if defined(TUNE_ROLL)
         distributePower(actuatorThrust, actuatorRoll, 0, 0);
 #elif defined(TUNE_PITCH)
@@ -339,7 +347,7 @@ static void stabilizerTask(void* param)
 #elif defined(TUNE_YAW)
         distributePower(actuatorThrust, 0, 0, -actuatorYaw);
 #else
-        distributePower(actuatorThrust, actuatorRoll, (int32_t) (eulerPitchDesired*600), -actuatorYaw);
+        distributePower(actuatorThrust, actuatorRoll, (int32_t) -(eulerPitchDesired*600), actuatorYaw);
 #endif
       }
       else
@@ -590,55 +598,80 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 //  motorPowerM3 =  limitThrust(thrust - pitch + yaw);
 //  motorPowerM4 =  limitThrust(thrust + roll - yaw);
 //#endif
-  if (pitch != 0){
-	motorsSetRatio(MOTOR_SERVO, 65535);
-	motorPowerM1 = limitThrust(-pitch);
-	motorPowerM2 = limitThrust(-pitch);
-	vTaskDelay(M2T(20));						// Wait for servo to rotate
+  if (abs(thrust) <= THRESHOLD) {		// Cannot keep thrust at zero if lift and yaw not zero
+//	if (abs(yaw) <= THRESHOLD) {			// No need to turn
+//	  if (abs(pitch) <= THRESHOLD) {		// No movement at all
+//		angle = 0.0;
+//		motorPowerM1 = 0;
+//		motorPowerM2 = 0;
+//	  }
+//	  else {
+//		angle = M_PI/2;
+//		motorPowerM1 = limitThrust(pitch/2);
+//		motorPowerM2 = limitThrust(pitch/2);
+//	  }
+//	}
+//	else {
+//	  // Turn first, lift = 0
+//	  angle = 0.0;
+//	  motorPowerM1 = limitThrust(yaw/2);
+//	  motorPowerM2 = limitThrust(-yaw/2);
+//	}
+	if (abs(pitch) > THRESHOLD){			// Lift first
+	  angle = M_PI/2;
+	  motorPowerM1 = limitThrust(pitch/2);
+	  motorPowerM2 = limitThrust(pitch/2);
+	}
+	else {
+	  angle = 0.0;
+	  motorPowerM1 = limitThrust(yaw/2);
+	  motorPowerM2 = limitThrust(-yaw/2);
+	}
   }
   else{
-	motorsSetRatio(MOTOR_SERVO, 0);
-	motorPowerM1 = limitThrust(thrust - (yaw));
-	motorPowerM2 = limitThrust(thrust + (yaw));
-//	motorPowerM1 = limitThrust(thrust);
-//	motorPowerM2 = limitThrust(thrust);
-	vTaskDelay(M2T(20));						// Wait for servo to rotate
+    angle = atan((float)pitch/(float)thrust);
+    motorPowerM1 = limitThrust((thrust - yaw)/(2*cos(angle)));
+    motorPowerM2 = limitThrust((thrust + yaw)/(2*cos(angle)));
   }
+  motorsSetRatio(MOTOR_SERVO, (angle+M_PI/2)*0xFFFF/M_PI);
+  //vTaskDelay(M2T(20));
 
   if ((motorPowerM1 >= 0) != (motorPowerM1_old >= 0)){
 	// Different sign ==> trigger the relay
 	motorsSetRatio(MOTOR_M1, 0);				// Stop motor first
-	vTaskDelay(M2T(10));						// 10 ms for stopping
+	//vTaskDelay(M2T(1));						// 1 ms for stopping
 	if (motorPowerM1 >= 0){
 	// Reset -- IO1 off IO2 on
 	GPIO_SetBits(GPIOB, GPIO_Pin_8);
-	vTaskDelay(M2T(10));						// 10 ms for triggering relay
 	}
 	else{
 	// Set -- IO1 on IO2 off
 	GPIO_SetBits(GPIOB, GPIO_Pin_5);
-	vTaskDelay(M2T(10));						// 10 ms for triggering relay
 	}
-	GPIO_ResetBits(GPIOB, GPIO_Pin_8);
-	GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+
   }
   if ((motorPowerM2 >= 0) != (motorPowerM2_old >= 0)){
 	// Different sign ==> trigger the relay
 	motorsSetRatio(MOTOR_M2, 0);				// Stop motor first
-	vTaskDelay(M2T(10));						// 10 ms for stopping
+	//vTaskDelay(M2T(1));						// 1 ms for stopping
 	if (motorPowerM2 >= 0){
 	  // Reset -- IO3 off IO4 on
-	  GPIO_SetBits(GPIOC, GPIO_Pin_12);
-	  vTaskDelay(M2T(10));						// 10 ms for triggering relay
+	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
 	}
 	else{
 	  // Set -- IO3 on IO4 off
-	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
-	  vTaskDelay(M2T(10));						// 10 ms for triggering relay
+	  GPIO_SetBits(GPIOC, GPIO_Pin_12);
 	}
-	GPIO_ResetBits(GPIOB, GPIO_Pin_4);
-	GPIO_ResetBits(GPIOC, GPIO_Pin_12);
+
   }
+  if (((motorPowerM1 >= 0) != (motorPowerM1_old >= 0)) || ((motorPowerM2 >= 0) != (motorPowerM2_old >= 0))){
+	  vTaskDelay(M2T(2));						// 1 ms for triggering relay
+  }
+  GPIO_ResetBits(GPIOB, GPIO_Pin_8);
+  GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+  GPIO_ResetBits(GPIOC, GPIO_Pin_12);
+  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+
   motorsSetRatio(MOTOR_M1, abs(motorPowerM1));
   motorsSetRatio(MOTOR_M2, abs(motorPowerM2));
 //  motorsSetRatio(MOTOR_M3, motorPowerM3);
@@ -646,6 +679,8 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 
   motorPowerM1_old = motorPowerM1;
   motorPowerM2_old = motorPowerM2;
+  motorLogM1 = ((float)motorPowerM1)/(300.00f);
+  motorLogM2 = ((float)motorPowerM2)/(300.00f);
 }
 
 static int32_t limitThrust(int32_t value)
@@ -690,8 +725,15 @@ LOG_GROUP_START(stabilizer)
 LOG_ADD(LOG_FLOAT, roll, &eulerRollActual)
 LOG_ADD(LOG_FLOAT, pitch, &eulerPitchActual)
 LOG_ADD(LOG_FLOAT, yaw, &eulerYawActual)
-LOG_ADD(LOG_UINT16, thrust, &actuatorThrust)
+LOG_ADD(LOG_INT32, thrust, &actuatorThrust)
 LOG_GROUP_STOP(stabilizer)
+
+LOG_GROUP_START(yaw)
+LOG_ADD(LOG_FLOAT, rate, &yawRateDesired)
+LOG_ADD(LOG_FLOAT, yaw_d, &eulerYawDesired)
+LOG_ADD(LOG_FLOAT, yaw, &eulerYawActual)
+LOG_ADD(LOG_INT16, actuator, &actuatorYaw)
+LOG_GROUP_STOP(yaw)
 
 LOG_GROUP_START(acc)
 LOG_ADD(LOG_FLOAT, x, &acc.x)
@@ -714,8 +756,9 @@ LOG_ADD(LOG_FLOAT, z, &mag.z)
 LOG_GROUP_STOP(mag)
 
 LOG_GROUP_START(motor)
-LOG_ADD(LOG_INT32, m1, &motorPowerM1)
-LOG_ADD(LOG_INT32, m2, &motorPowerM2)
+LOG_ADD(LOG_FLOAT, m1, &motorLogM1)
+LOG_ADD(LOG_FLOAT, m2, &motorLogM2)
+LOG_ADD(LOG_FLOAT, mServ, &angle)
 LOG_GROUP_STOP(motor)
 
 // LOG altitude hold PID controller states

@@ -75,7 +75,8 @@ static uint16_t motorsBLConvBitsTo16(uint16_t bits)
 
 static uint16_t motorsBLConv16ToBits(uint16_t bits)
 {
-  return (MOTORS_BL_PWM_CNT_FOR_1MS*0.725 + ((bits * MOTORS_BL_PWM_CNT_FOR_1MS * 0.975) / 0xFFFF));
+  //return (MOTORS_BL_PWM_CNT_FOR_1MS*0.725 + ((bits * MOTORS_BL_PWM_CNT_FOR_1MS * 0.975) / 0xFFFF));
+  return (MOTORS_BL_PWM_CNT_FOR_1MS*0.50+ ((bits * MOTORS_BL_PWM_CNT_FOR_1MS * 1.80) / 0xFFFF));
 }
 
 static uint16_t motorsConvBitsTo16(uint16_t bits)
@@ -240,9 +241,7 @@ bool motorsTest(void)
 //  vTaskDelay(M2T(2000));
 //  motorMap[2]->setCompare(motorMap[2]->tim, (uint32_t) (0.7*MOTORS_BL_PWM_CNT_FOR_1MS));
 //  vTaskDelay(M2T(2000));
-  motorsSetRatio(MOTORS[2],0);
-  vTaskDelay(M2T(2000));
-  motorsSetRatio(MOTORS[2],65535);
+  motorsSetRatio(MOTORS[2],32767);
 
   return isInit;
 }

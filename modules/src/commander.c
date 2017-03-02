@@ -31,7 +31,7 @@
 #include "configblock.h"
 #include "param.h"
 
-#define MIN_THRUST  1000
+#define MIN_THRUST  200
 #define MAX_THRUST  65535
 
 struct CommanderCrtpValues
@@ -53,7 +53,7 @@ static bool altHoldModeOld = false;
 
 static RPYType stabilizationModeRoll  = ANGLE; // Current stabilization type of roll (rate or angle)
 static RPYType stabilizationModePitch = ANGLE; // Current stabilization type of pitch (rate or angle)
-static RPYType stabilizationModeYaw   = RATE;  // Current stabilization type of yaw (rate or angle)
+static RPYType stabilizationModeYaw   = ANGLE;  // Current stabilization type of yaw (rate or angle)
 
 static YawModeType yawMode = DEFUALT_YAW_MODE; // Yaw mode configuration
 static bool carefreeResetFront;             // Reset what is front in carefree mode
