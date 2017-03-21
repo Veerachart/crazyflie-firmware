@@ -271,6 +271,21 @@ float invSqrt(float x)
   return y;
 }
 
+// Fixing heading with magnetometer
+// Just simple average first
+void sensfusion6DriftCorrect(const float heading_error)
+{
+  float qa, qb, qc;
+  float angle = heading_error*M_PI_F/180.0;
+  qa = q0;
+  qb = q1;
+  qc = q2;
+  q0 = qa*cosf(angle/2.0f) - q3*sinf(angle/2.0f);
+  q1 = qb*cosf(angle/2.0f) + qc*sinf(angle/2.0f);
+  q2 = -qb*sinf(angle/2.0f) + qc*cosf(angle/2.0f);
+  q3 = qa*sinf(angle/2.0f) + q3*cosf(angle/2.0f);
+}
+
 
 
 PARAM_GROUP_START(sensorfusion6)

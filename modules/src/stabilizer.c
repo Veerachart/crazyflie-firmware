@@ -124,6 +124,27 @@ static uint16_t altHoldMinThrust    = 00000; // minimum hover thrust - not used 
 static uint16_t altHoldBaseThrust   = 43000; // approximate throttle needed when in perfect hover. More weight/older battery can use a higher value
 static uint16_t altHoldMaxThrust    = 60000; // max altitude hold thrust
 
+static float bias_x					= 0.075;		// Middle value for x
+static float bias_y					= -2.050;		// Middle value for y
+static float bias_z					= 2.899;		// Middle value for z
+static float scale_x 				= 1.049;		// Scale value for x
+static float scale_y 				= 1.019;		// Scale value for y
+static float scale_z 				= 0.938;		// Scale value for z
+static float heading 				= 0;					// Magnetic heading
+static float bias_m1x				= -0.080;				// Effect from relay when M1 is negative - x
+static float bias_m1y				= 0.040;				// Effect from relay when M1 is negative - y
+static float bias_m1z				= 0.020;				// Effect from relay when M1 is negative - z
+static float bias_m2x				= 0.885;				// Effect from relay when M2 is negative - x
+static float bias_m2y				= 0.065;				// Effect from relay when M2 is negative - y
+static float bias_m2z				= -0.105;				// Effect from relay when M2 is negative - z
+static float bias_bothx				= 0.805;				// Effect from relay when M1&2 are negative - x
+static float bias_bothy				= 0.100;				// Effect from relay when M1&2 are negative - y
+static float bias_bothz				= -0.085;				// Effect from relay when M1&2 are negative - z
+static float mag_x_calib = 0;
+static float mag_y_calib = 0;
+static float mag_z_calib = 0;
+
+
 #if defined(SITAW_ENABLED)
 // Automatic take-off variables
 static bool autoTOActive           = false; // Flag indicating if automatic take-off is active / deactive.
@@ -179,6 +200,16 @@ void stabilizerInit(void)
 #if defined(SITAW_ENABLED)
   sitAwInit();
 #endif
+
+  GPIO_SetBits(GPIOB, GPIO_Pin_8);
+  GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+  GPIO_SetBits(GPIOC, GPIO_Pin_12);
+  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+  vTaskDelay(10);
+  GPIO_ResetBits(GPIOB, GPIO_Pin_8);
+  GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+  GPIO_ResetBits(GPIOC, GPIO_Pin_12);
+  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
 
   rollRateDesired = 0;
   pitchRateDesired = 0;
@@ -249,6 +280,10 @@ static void stabilizerTask(void* param)
   uint32_t altHoldCounter = 0;
   uint32_t lastWakeTime;
   float yawRateAngle = 0;
+  float Bx = 0;
+  float By = 0;
+  int16_t counterMagnetometer = 0;
+  float heading_zero = 0;
 
   vTaskSetApplicationTaskTag(0, (void*)TASK_STABILIZER_ID_NBR);
 
@@ -297,6 +332,68 @@ static void stabilizerTask(void* param)
         controllerCorrectAttitudePID(eulerRollActual, eulerPitchActual, eulerYawActual,
                                      eulerRollDesired, eulerPitchDesired, eulerYawDesired,
                                      &rollRateDesired, &pitchRateDesired, &yawRateDesired);
+        mag_x_calib = scale_x*(mag.x-bias_x);
+		mag_y_calib = scale_y*(mag.y-bias_y);
+		mag_z_calib = scale_z*(mag.z-bias_z);
+
+		if (motorPowerM1_old < 0 && motorPowerM2_old >= 0) {
+			mag_x_calib -= bias_m1x;
+			mag_y_calib -= bias_m1y;
+			mag_z_calib -= bias_m1z;
+		}
+		else if (motorPowerM2_old < 0 && motorPowerM1_old >= 0) {
+			mag_x_calib -= bias_m2x;
+			mag_y_calib -= bias_m2y;
+			mag_z_calib -= bias_m2z;
+		}
+		else if (motorPowerM2_old < 0 && motorPowerM1_old < 0) {
+			mag_x_calib -= bias_bothx;
+			mag_y_calib -= bias_bothy;
+			mag_z_calib -= bias_bothz;
+		}
+
+		Bx = mag_x_calib*cosf(eulerPitchActual*(float)M_PI / 180) + mag_y_calib*sinf(eulerPitchActual*(float)M_PI / 180)*sinf(eulerRollActual*(float)M_PI / 180) + mag_z_calib*sinf(eulerPitchActual*(float)M_PI / 180)*cosf(eulerRollActual*(float)M_PI / 180);
+		By = mag_y_calib*cosf(eulerRollActual*(float)M_PI / 180) + mag_z_calib*sinf(eulerRollActual*(float)M_PI / 180);
+		heading = atan2f(By, Bx)*(float)180 / M_PI;
+
+//		if (counterMagnetometer < 20) {
+//			DEBUG_PRINT("%.3f\n", heading);
+//			if (heading - (float)heading_zero/counterMagnetometer > 180.0f)
+//				heading_zero += heading-360.0f;
+//			else if ((float)heading_zero/counterMagnetometer - heading > 180.0f)
+//				heading_zero += heading+360.0f;
+//			else
+//				heading_zero += heading;
+//			counterMagnetometer++;
+//            if (counterMagnetometer == 20) {
+//			  heading_zero = (float) heading_zero/20.0;
+//			  if (heading_zero < -180.0f) {
+//				  heading_zero += 360.0f;
+//			  }
+//			  else if (heading_zero > 180.0f) {
+//				  heading_zero -= 360.0f;
+//			  }
+//			  DEBUG_PRINT("%.3f\n", heading_zero);
+//            }
+//            vTaskDelay(4);
+//            continue;
+//		}
+//		else {
+//			heading -= heading_zero;
+//			if (heading < -180.0f) {
+//				heading += 360.0f;
+//			}
+//			else if (heading > 180.0f) {
+//				heading -= 360.0f;
+//			}
+//			float diff = heading - eulerYawActual;
+//			if (diff > 180.0f)
+//				diff -= 360.0f;
+//			else if (diff < -180.0f)
+//				diff += 360.0f;
+//			sensfusion6DriftCorrect(diff*0.1f);
+//		}
+
         attitudeCounter = 0;
 
         /* Call out after performing attitude updates, if any functions would like to use the calculated values. */
@@ -339,7 +436,7 @@ static void stabilizerTask(void* param)
       /* Call out before performing thrust updates, if any functions would like to influence the thrust. */
       stabilizerPreThrustUpdateCallOut();
 
-      if (actuatorThrust != 0 || actuatorYaw != 0 || eulerPitchDesired != 0){		// No input command, so no drive
+      if (actuatorThrust != 0 || actuatorYaw != 100 || eulerPitchDesired != 0){		// No input command, so no drive
 #if defined(TUNE_ROLL)
         distributePower(actuatorThrust, actuatorRoll, 0, 0);
 #elif defined(TUNE_PITCH)
@@ -630,8 +727,8 @@ static void distributePower(const int32_t thrust, const int16_t roll,
   }
   else{
     angle = atan((float)pitch/(float)thrust);
-    motorPowerM1 = limitThrust((thrust - yaw)/(2*cos(angle)));
-    motorPowerM2 = limitThrust((thrust + yaw)/(2*cos(angle)));
+    motorPowerM1 = limitThrust((thrust + yaw)/(2*cos(angle)));
+    motorPowerM2 = limitThrust((thrust - yaw)/(2*cos(angle)));
   }
   motorsSetRatio(MOTOR_SERVO, (angle+M_PI/2)*0xFFFF/M_PI);
   //vTaskDelay(M2T(20));
@@ -656,11 +753,11 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 	//vTaskDelay(M2T(1));						// 1 ms for stopping
 	if (motorPowerM2 >= 0){
 	  // Reset -- IO3 off IO4 on
-	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
+		GPIO_SetBits(GPIOC, GPIO_Pin_12);
 	}
 	else{
 	  // Set -- IO3 on IO4 off
-	  GPIO_SetBits(GPIOC, GPIO_Pin_12);
+	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
 	}
 
   }
@@ -753,7 +850,15 @@ LOG_GROUP_START(mag)
 LOG_ADD(LOG_FLOAT, x, &mag.x)
 LOG_ADD(LOG_FLOAT, y, &mag.y)
 LOG_ADD(LOG_FLOAT, z, &mag.z)
+LOG_ADD(LOG_FLOAT, heading, &heading)
 LOG_GROUP_STOP(mag)
+
+LOG_GROUP_START(magcalib)
+LOG_ADD(LOG_FLOAT, x, &mag_x_calib)
+LOG_ADD(LOG_FLOAT, y, &mag_y_calib)
+LOG_ADD(LOG_FLOAT, z, &mag_z_calib)
+LOG_ADD(LOG_FLOAT, heading, &heading)
+LOG_GROUP_STOP(magcalib)
 
 LOG_GROUP_START(motor)
 LOG_ADD(LOG_FLOAT, m1, &motorLogM1)
