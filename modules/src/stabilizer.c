@@ -64,6 +64,10 @@
 #define ALTHOLD_UPDATE_RATE_DIVIDER  5 // 500hz/5 = 100hz for barometer measurements
 #define ALTHOLD_UPDATE_DT  (float)(1.0 / (IMU_UPDATE_FREQ / ALTHOLD_UPDATE_RATE_DIVIDER))   // 500hz
 
+// Magnetometer
+#define MAGNETOMETER_UPDATE_RATE_DIVIDER  25	// 20 Hz for reading
+#define MAGNETOMETER_FUSION_RATE_DIVIDER  100	// 5 Hz for fusion with gyroscope (4-sample averaging)
+
 // Threshold value for zero
 #define THRESHOLD 20
 
@@ -143,7 +147,16 @@ static float bias_bothz				= -0.085;				// Effect from relay when M1&2 are negat
 static float mag_x_calib = 0;
 static float mag_y_calib = 0;
 static float mag_z_calib = 0;
-
+static float mag_x_calib_old;
+static float mag_y_calib_old;
+static float mag_z_calib_old;
+static float mag_x_accum;
+static float mag_y_accum;
+static float mag_z_accum;
+static float mag_x;
+static float mag_y;
+static float mag_z;
+static int mag_counter;
 
 #if defined(SITAW_ENABLED)
 // Automatic take-off variables
@@ -278,12 +291,11 @@ static void stabilizerTask(void* param)
   RPYType yawType;
   uint32_t attitudeCounter = 0;
   uint32_t altHoldCounter = 0;
+  uint32_t magnetometerCounter = 0;
   uint32_t lastWakeTime;
   float yawRateAngle = 0;
   float Bx = 0;
   float By = 0;
-  int16_t counterMagnetometer = 0;
-  float heading_zero = 0;
 
   vTaskSetApplicationTaskTag(0, (void*)TASK_STABILIZER_ID_NBR);
 
@@ -332,29 +344,7 @@ static void stabilizerTask(void* param)
         controllerCorrectAttitudePID(eulerRollActual, eulerPitchActual, eulerYawActual,
                                      eulerRollDesired, eulerPitchDesired, eulerYawDesired,
                                      &rollRateDesired, &pitchRateDesired, &yawRateDesired);
-        mag_x_calib = scale_x*(mag.x-bias_x);
-		mag_y_calib = scale_y*(mag.y-bias_y);
-		mag_z_calib = scale_z*(mag.z-bias_z);
 
-		if (motorPowerM1_old < 0 && motorPowerM2_old >= 0) {
-			mag_x_calib -= bias_m1x;
-			mag_y_calib -= bias_m1y;
-			mag_z_calib -= bias_m1z;
-		}
-		else if (motorPowerM2_old < 0 && motorPowerM1_old >= 0) {
-			mag_x_calib -= bias_m2x;
-			mag_y_calib -= bias_m2y;
-			mag_z_calib -= bias_m2z;
-		}
-		else if (motorPowerM2_old < 0 && motorPowerM1_old < 0) {
-			mag_x_calib -= bias_bothx;
-			mag_y_calib -= bias_bothy;
-			mag_z_calib -= bias_bothz;
-		}
-
-		Bx = mag_x_calib*cosf(eulerPitchActual*(float)M_PI / 180) + mag_y_calib*sinf(eulerPitchActual*(float)M_PI / 180)*sinf(eulerRollActual*(float)M_PI / 180) + mag_z_calib*sinf(eulerPitchActual*(float)M_PI / 180)*cosf(eulerRollActual*(float)M_PI / 180);
-		By = mag_y_calib*cosf(eulerRollActual*(float)M_PI / 180) + mag_z_calib*sinf(eulerRollActual*(float)M_PI / 180);
-		heading = atan2f(By, Bx)*(float)180 / M_PI;
 
 //		if (counterMagnetometer < 20) {
 //			DEBUG_PRINT("%.3f\n", heading);
@@ -405,6 +395,63 @@ static void stabilizerTask(void* param)
       {
         stabilizerAltHoldUpdate();
         altHoldCounter = 0;
+      }
+
+      // 20 Hz
+      if (++magnetometerCounter % MAGNETOMETER_UPDATE_RATE_DIVIDER == 0) {
+    	  mag_x_calib = scale_x*(mag.x-bias_x);
+		  mag_y_calib = scale_y*(mag.y-bias_y);
+		  mag_z_calib = scale_z*(mag.z-bias_z);
+
+		  if (motorPowerM1_old < 0 && motorPowerM2_old >= 0) {
+			  mag_x_calib -= bias_m1x;
+			  mag_y_calib -= bias_m1y;
+			  mag_z_calib -= bias_m1z;
+		  }
+		  else if (motorPowerM2_old < 0 && motorPowerM1_old >= 0) {
+			  mag_x_calib -= bias_m2x;
+			  mag_y_calib -= bias_m2y;
+			  mag_z_calib -= bias_m2z;
+		  }
+		  else if (motorPowerM2_old < 0 && motorPowerM1_old < 0) {
+			  mag_x_calib -= bias_bothx;
+			  mag_y_calib -= bias_bothy;
+			  mag_z_calib -= bias_bothz;
+		  }
+
+		  if ((fabsf(mag_x_calib - mag_x_calib_old) <= 0.1 && fabsf(mag_y_calib - mag_y_calib_old) <= 0.1 && fabsf(mag_z_calib - mag_z_calib_old) <= 0.1) || (mag_x_calib_old == 0 && mag_y_calib_old == 0 && mag_z_calib_old == 0)) {
+//		  if (1) {
+			  // The value does not jumps too far
+			  // (Relay triggers cause jumps in magnetic field and result in wrong heading)
+			  mag_x_accum += mag_x_calib;
+			  mag_y_accum += mag_y_calib;
+			  mag_z_accum += mag_z_calib;
+			  mag_counter++;
+			  mag_x_calib_old = mag_x_calib;
+			  mag_y_calib_old = mag_y_calib;
+			  mag_z_calib_old = mag_z_calib;
+		  }
+
+		  if (magnetometerCounter == MAGNETOMETER_FUSION_RATE_DIVIDER) {		// 5 Hz
+			  if (mag_counter){
+				  mag_x = (float) mag_x_accum/mag_counter;
+				  mag_y = (float) mag_y_accum/mag_counter;
+				  mag_z = (float) mag_z_accum/mag_counter;
+				  Bx = mag_x*cosf(eulerPitchActual*(float)M_PI / 180) + mag_y*sinf(eulerPitchActual*(float)M_PI / 180)*sinf(eulerRollActual*(float)M_PI / 180) + mag_z*sinf(eulerPitchActual*(float)M_PI / 180)*cosf(eulerRollActual*(float)M_PI / 180);
+				  By = mag_y*cosf(eulerRollActual*(float)M_PI / 180) + mag_z*sinf(eulerRollActual*(float)M_PI / 180);
+				  heading = atan2f(By, Bx)*(float)180 / M_PI;
+				  mag_counter = 0;
+				  mag_x_accum = 0;
+				  mag_y_accum = 0;
+				  mag_z_accum = 0;
+			  }
+			  else {
+				  mag_x_calib_old = 0;
+				  mag_y_calib_old = 0;
+				  mag_z_calib_old = 0;
+			  }
+			  magnetometerCounter = 0;
+		  }
       }
 
       if (rollType == RATE)
@@ -853,10 +900,16 @@ LOG_ADD(LOG_FLOAT, z, &mag.z)
 LOG_ADD(LOG_FLOAT, heading, &heading)
 LOG_GROUP_STOP(mag)
 
+LOG_GROUP_START(magold)
+LOG_ADD(LOG_FLOAT, x, &mag_x_calib_old)
+LOG_ADD(LOG_FLOAT, y, &mag_y_calib_old)
+LOG_ADD(LOG_FLOAT, z, &mag_z_calib_old)
+LOG_GROUP_STOP(magold)
+
 LOG_GROUP_START(magcalib)
-LOG_ADD(LOG_FLOAT, x, &mag_x_calib)
-LOG_ADD(LOG_FLOAT, y, &mag_y_calib)
-LOG_ADD(LOG_FLOAT, z, &mag_z_calib)
+LOG_ADD(LOG_FLOAT, x, &mag_x)
+LOG_ADD(LOG_FLOAT, y, &mag_y)
+LOG_ADD(LOG_FLOAT, z, &mag_z)
 LOG_ADD(LOG_FLOAT, heading, &heading)
 LOG_GROUP_STOP(magcalib)
 
