@@ -276,14 +276,16 @@ float invSqrt(float x)
 void sensfusion6DriftCorrect(const float heading_error)
 {
   float qa, qb, qc;
-  float angle = heading_error*M_PI_F/180.0;
+  float halfangle = heading_error*M_PI_F/(180.0*2.0);
+  float cos_halfangle = cosf(halfangle);
+  float sin_halfangle = sinf(halfangle);
   qa = q0;
   qb = q1;
   qc = q2;
-  q0 = qa*cosf(angle/2.0f) - q3*sinf(angle/2.0f);
-  q1 = qb*cosf(angle/2.0f) + qc*sinf(angle/2.0f);
-  q2 = -qb*sinf(angle/2.0f) + qc*cosf(angle/2.0f);
-  q3 = qa*sinf(angle/2.0f) + q3*cosf(angle/2.0f);
+  q0 = qa*cos_halfangle - q3*sin_halfangle;
+  q1 = qb*cos_halfangle + qc*sin_halfangle;
+  q2 = -qb*sin_halfangle + qc*cos_halfangle;
+  q3 = qa*sin_halfangle + q3*cos_halfangle;
 }
 
 
