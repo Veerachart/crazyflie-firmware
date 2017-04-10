@@ -27,6 +27,7 @@
 
 #include "sensfusion6.h"
 #include "param.h"
+#include "log.h"
 
 #define M_PI_F ((float) M_PI)
 
@@ -53,6 +54,10 @@ float q0 = 1.0f;
 float q1 = 0.0f;
 float q2 = 0.0f;
 float q3 = 0.0f;  // quaternion of sensor frame relative to auxiliary frame
+
+float heading_x;
+float heading_y;
+static float e_mag, m_x, m_y;
 
 static bool isInit;
 
@@ -155,16 +160,23 @@ void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float 
 // Date     Author      Notes
 // 29/09/2011 SOH Madgwick    Initial release
 // 02/10/2011 SOH Madgwick  Optimised for reduced CPU load
-void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float az, float dt)
+void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float az, float dt, float bx, float by, float bz, bool update_mag)
 {
   float recipNorm;
   float halfvx, halfvy, halfvz;
-  float halfex, halfey, halfez;
+  float halfex = 0;
+  float halfey = 0;
+  float halfez = 0;
   float qa, qb, qc;
 
   gx = gx * M_PI_F / 180;
   gy = gy * M_PI_F / 180;
   gz = gz * M_PI_F / 180;
+
+  // Estimated direction of gravity and vector perpendicular to magnetic flux
+  halfvx = q1 * q3 - q0 * q2;
+  halfvy = q0 * q1 + q2 * q3;
+  halfvz = q0 * q0 - 0.5f + q3 * q3;
 
   // Compute feedback only if accelerometer measurement valid (avoids NaN in accelerometer normalisation)
   if(!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f)))
@@ -175,16 +187,28 @@ void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float 
     ay *= recipNorm;
     az *= recipNorm;
 
-    // Estimated direction of gravity and vector perpendicular to magnetic flux
-    halfvx = q1 * q3 - q0 * q2;
-    halfvy = q0 * q1 + q2 * q3;
-    halfvz = q0 * q0 - 0.5f + q3 * q3;
-
     // Error is sum of cross product between estimated and measured direction of gravity
     halfex = (ay * halfvz - az * halfvy);
     halfey = (az * halfvx - ax * halfvz);
     halfez = (ax * halfvy - ay * halfvx);
+  }
 
+  if(update_mag)
+  {
+	m_x = bx*(q0*q0 + q1*q1 - 0.5) + by*(q1*q2 - q0*q3) + bz*(q1*q3 + q0*q2);
+	m_y = bx*(q1*q2 + q0*q3) + by*(q0*q0 + q2*q2 - 0.5) + bz*(q2*q3 - q0*q1);
+	recipNorm = invSqrt(m_x*m_x + m_y*m_y);
+	m_x *= recipNorm;
+	m_y *= recipNorm;
+
+	e_mag = m_x*heading_y - m_y*heading_x;
+	halfex += e_mag*halfvx;
+	halfey += e_mag*halfvy;
+	halfez += e_mag*halfvz;
+  }
+
+  if(!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f)) || update_mag)
+  {
     // Compute and apply integral feedback if enabled
     if(twoKi > 0.0f)
     {
@@ -298,3 +322,13 @@ PARAM_ADD(PARAM_FLOAT, kp, &twoKp)
 PARAM_ADD(PARAM_FLOAT, ki, &twoKi)
 #endif
 PARAM_GROUP_STOP(sensorfusion6)
+
+LOG_GROUP_START(magfusion)
+LOG_ADD(LOG_FLOAT, e_mag, &e_mag)
+LOG_ADD(LOG_FLOAT, m_x, &m_x)
+LOG_ADD(LOG_FLOAT, m_y, &m_y)
+LOG_ADD(LOG_FLOAT, q0, &q0)
+LOG_ADD(LOG_FLOAT, q1, &q1)
+LOG_ADD(LOG_FLOAT, q2, &q2)
+LOG_ADD(LOG_FLOAT, q3, &q3)
+LOG_GROUP_STOP(magfusion)

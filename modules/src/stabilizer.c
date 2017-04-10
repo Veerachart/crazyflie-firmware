@@ -129,22 +129,22 @@ static uint16_t altHoldMinThrust    = 00000; // minimum hover thrust - not used 
 static uint16_t altHoldBaseThrust   = 43000; // approximate throttle needed when in perfect hover. More weight/older battery can use a higher value
 static uint16_t altHoldMaxThrust    = 60000; // max altitude hold thrust
 
-static float bias_x					= 0.055;		// Middle value for x
-static float bias_y					= -2.266;		// Middle value for y
-static float bias_z					= 3.097;		// Middle value for z
-static float scale_x 				= 1.051;		// Scale value for x
-static float scale_y 				= 1.035;		// Scale value for y
-static float scale_z 				= 0.924;		// Scale value for z
+static float bias_x					= 0.048;		// Middle value for x
+static float bias_y					= -2.310;		// Middle value for y
+static float bias_z					= 3.092;		// Middle value for z
+static float scale_x 				= 1.060;		// Scale value for x
+static float scale_y 				= 1.017;		// Scale value for y
+static float scale_z 				= 0.931;		// Scale value for z
 static float heading 				= 0;					// Magnetic heading
-static float bias_m1x				= -0.080;				// Effect from relay when M1 is negative - x
-static float bias_m1y				= 0.040;				// Effect from relay when M1 is negative - y
+static float bias_m1x				= -0.085;				// Effect from relay when M1 is negative - x
+static float bias_m1y				= 0.045;				// Effect from relay when M1 is negative - y
 static float bias_m1z				= 0.010;				// Effect from relay when M1 is negative - z
-static float bias_m2x				= 0.950;				// Effect from relay when M2 is negative - x
-static float bias_m2y				= 0.080;				// Effect from relay when M2 is negative - y
-static float bias_m2z				= -0.110;				// Effect from relay when M2 is negative - z
-static float bias_bothx				= 0.860;				// Effect from relay when M1&2 are negative - x
+static float bias_m2x				= 0.965;				// Effect from relay when M2 is negative - x
+static float bias_m2y				= 0.085;				// Effect from relay when M2 is negative - y
+static float bias_m2z				= -0.105;				// Effect from relay when M2 is negative - z
+static float bias_bothx				= 0.885;				// Effect from relay when M1&2 are negative - x
 static float bias_bothy				= 0.120;				// Effect from relay when M1&2 are negative - y
-static float bias_bothz				= -0.090;				// Effect from relay when M1&2 are negative - z
+static float bias_bothz				= -0.085;				// Effect from relay when M1&2 are negative - z
 static float mag_x_calib = 0;
 static float mag_y_calib = 0;
 static float mag_z_calib = 0;
@@ -164,6 +164,7 @@ static int mag_counter;
 static int heading_calibrate = 0;
 static bool isHeadingCalibrated = false;
 static float heading_zero;
+static bool updateMagneticHeading = false;
 
 #if defined(SITAW_ENABLED)
 // Automatic take-off variables
@@ -337,7 +338,9 @@ static void stabilizerTask(void* param)
       // 250HZ
       if (++attitudeCounter >= ATTITUDE_UPDATE_RATE_DIVIDER)
       {
-        sensfusion6UpdateQ(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, FUSION_UPDATE_DT);
+        sensfusion6UpdateQ(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, FUSION_UPDATE_DT, mag_x, mag_y, mag_z, false);
+        if (updateMagneticHeading)
+        	updateMagneticHeading = false;
         sensfusion6GetEulerRPY(&eulerRollActual, &eulerPitchActual, &eulerYawActual);
 
         accWZ = sensfusion6GetAccZWithoutGravity(acc.x, acc.y, acc.z);
@@ -426,9 +429,15 @@ static void stabilizerTask(void* param)
 			  mag_z_calib -= bias_bothz;
 		  }
 
-		  if ((fabsf(mag_x_calib - mag_x_calib_old) <= 0.1 && fabsf(mag_y_calib - mag_y_calib_old) <= 0.1 && fabsf(mag_z_calib - mag_z_calib_old) <= 0.1) ||
+		  // Change axis to match magnetometer with gyroscope
+		  float temp = mag_x_calib;
+		  mag_x_calib = mag_y_calib;
+		  mag_y_calib = temp;
+		  mag_z_calib = -mag_z_calib;
+
+		  if ((fabsf(mag_x_calib - mag_x_calib_old) <= 0.05 && fabsf(mag_y_calib - mag_y_calib_old) <= 0.05 && fabsf(mag_z_calib - mag_z_calib_old) <= 0.05) ||
 				  ((mag_x_calib_old == 0 && mag_y_calib_old == 0 && mag_z_calib_old == 0) && ((mag_x_calib_previous == 0 && mag_y_calib_previous == 0 && mag_z_calib_previous == 0) ||
-				  (fabsf(mag_x_calib - mag_x_calib_previous) <= 0.1 && fabsf(mag_y_calib - mag_y_calib_previous) <= 0.1 && fabsf(mag_z_calib - mag_z_calib_previous) <= 0.1)))) {
+				  (fabsf(mag_x_calib - mag_x_calib_previous) <= 0.05 && fabsf(mag_y_calib - mag_y_calib_previous) <= 0.05 && fabsf(mag_z_calib - mag_z_calib_previous) <= 0.05)))) {
 //		  if (1) {
 			  // The value does not jumps too far
 			  // (Relay triggers cause jumps in magnetic field and result in wrong heading)
@@ -450,19 +459,20 @@ static void stabilizerTask(void* param)
 				  By = mag_y*cosf(eulerRollActual*(float)M_PI / 180) + mag_z*sinf(eulerRollActual*(float)M_PI / 180);
 				  heading = atan2f(By, Bx)*(float)180 / M_PI;
 				  if (isHeadingCalibrated) {
-					  heading -= heading_zero;
-					  if (heading < -180.0f) {
-						  heading += 360.0f;
-					  }
-					  else if (heading > 180.0f) {
-						  heading -= 360.0f;
-					  }
-					  float diff = heading - eulerYawActual;
-					  if (diff > 180.0f)
-						  diff -= 360.0f;
-					  else if (diff < -180.0f)
-						  diff += 360.0f;
-					  sensfusion6DriftCorrect(diff*0.1f);
+//					  heading -= heading_zero;
+//					  if (heading < -180.0f) {
+//						  heading += 360.0f;
+//					  }
+//					  else if (heading > 180.0f) {
+//						  heading -= 360.0f;
+//					  }
+//					  float diff = heading - eulerYawActual;
+//					  if (diff > 180.0f)
+//						  diff -= 360.0f;
+//					  else if (diff < -180.0f)
+//						  diff += 360.0f;
+//					  sensfusion6DriftCorrect(diff*0.1f);
+					  updateMagneticHeading = true;
 				  }
 				  else {
 					  heading_zero += heading;
@@ -471,6 +481,8 @@ static void stabilizerTask(void* param)
 						  heading_zero = (float) heading_zero/heading_calibrate;
 						  isHeadingCalibrated = true;
 						  DEBUG_PRINT("Calibrated: %.3f\n", heading_zero);
+						  heading_x = cosf(heading_zero*M_PI/180.0);
+						  heading_y = sinf(heading_zero*M_PI/180.0);
 					  }
 				  }
 				  mag_counter = 0;
@@ -827,8 +839,14 @@ static void distributePower(const int32_t thrust, const int16_t roll,
   }
   else{
     angle = atan((float)pitch/(float)thrust);
-    motorPowerM1 = limitThrust((thrust - yaw)/(2*cos(angle)));
-    motorPowerM2 = limitThrust((thrust + yaw)/(2*cos(angle)));
+    if (thrust > 0) {
+		motorPowerM1 = limitThrust((thrust + yaw)/(2*cos(angle)));
+		motorPowerM2 = limitThrust(1.15*(thrust - yaw)/(2*cos(angle)));
+    }
+    else {
+    	motorPowerM1 = limitThrust(1.15*(thrust + yaw)/(2*cos(angle)));
+		motorPowerM2 = limitThrust((thrust - yaw)/(2*cos(angle)));
+    }
   }
   motorsSetRatio(MOTOR_SERVO, (angle+M_PI/2)*0xFFFF/M_PI);
   //vTaskDelay(M2T(20));

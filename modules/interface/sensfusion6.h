@@ -27,10 +27,13 @@
 #define SENSORFUSION6_H_
 #include <stdbool.h>
 
+extern float heading_x;
+extern float heading_y;
+
 void sensfusion6Init(void);
 bool sensfusion6Test(void);
 
-void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float az, float dt);
+void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float az, float dt, float bx, float by, float bz, bool update_mag);
 void sensfusion6GetEulerRPY(float* roll, float* pitch, float* yaw);
 float sensfusion6GetAccZWithoutGravity(const float ax, const float ay, const float az);
 void sensfusion6DriftCorrect(const float heading_error);
