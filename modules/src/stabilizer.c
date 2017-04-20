@@ -166,6 +166,8 @@ static bool isHeadingCalibrated = false;
 static float heading_zero;
 static bool updateMagneticHeading = false;
 
+static float scale = 1.1;
+
 #if defined(SITAW_ENABLED)
 // Automatic take-off variables
 static bool autoTOActive           = false; // Flag indicating if automatic take-off is active / deactive.
@@ -828,8 +830,8 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 	}
 	else if (abs(yaw) > THRESHOLD){
 	  angle = 0.0;
-	  motorPowerM1 = limitThrust(yaw/2);
-	  motorPowerM2 = limitThrust(-yaw/2);
+	  motorPowerM1 = limitThrust(-yaw/2);
+	  motorPowerM2 = limitThrust(yaw/2);
 	}
 	else {
 	  angle = 0;
@@ -839,13 +841,15 @@ static void distributePower(const int32_t thrust, const int16_t roll,
   }
   else{
     angle = atan((float)pitch/(float)thrust);
+//    motorPowerM1 = limitThrust((thrust-yaw)/(2*cos(angle)));
+//	motorPowerM2 = limitThrust((thrust+yaw)/(2*cos(angle)));
     if (thrust > 0) {
-		motorPowerM1 = limitThrust((thrust + yaw)/(2*cos(angle)));
-		motorPowerM2 = limitThrust(1.15*(thrust - yaw)/(2*cos(angle)));
+		motorPowerM1 = limitThrust((thrust - yaw)/(2*cos(angle)));
+		motorPowerM2 = limitThrust((scale*thrust + yaw)/(2*cos(angle)));
     }
     else {
-    	motorPowerM1 = limitThrust(1.15*(thrust + yaw)/(2*cos(angle)));
-		motorPowerM2 = limitThrust((thrust - yaw)/(2*cos(angle)));
+    	motorPowerM1 = limitThrust((scale*thrust - yaw)/(2*cos(angle)));
+		motorPowerM2 = limitThrust((thrust + yaw)/(2*cos(angle)));
     }
   }
   motorsSetRatio(MOTOR_SERVO, (angle+M_PI/2)*0xFFFF/M_PI);
@@ -856,12 +860,13 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 	motorsSetRatio(MOTOR_M1, 0);				// Stop motor first
 	//vTaskDelay(M2T(1));						// 1 ms for stopping
 	if (motorPowerM1 >= 0){
-	// Reset -- IO1 off IO2 on
-	GPIO_SetBits(GPIOB, GPIO_Pin_8);
+	  // Reset -- IO3 off IO4 on
+	  GPIO_SetBits(GPIOC, GPIO_Pin_12);
+
 	}
 	else{
-	// Set -- IO1 on IO2 off
-	GPIO_SetBits(GPIOB, GPIO_Pin_5);
+	  // Set -- IO3 on IO4 off
+	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
 	}
 
   }
@@ -870,12 +875,12 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 	motorsSetRatio(MOTOR_M2, 0);				// Stop motor first
 	//vTaskDelay(M2T(1));						// 1 ms for stopping
 	if (motorPowerM2 >= 0){
-	  // Reset -- IO3 off IO4 on
-		GPIO_SetBits(GPIOC, GPIO_Pin_12);
+	  // Reset -- IO1 off IO2 on
+	  GPIO_SetBits(GPIOB, GPIO_Pin_8);
 	}
 	else{
-	  // Set -- IO3 on IO4 off
-	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
+	  // Set -- IO1 on IO2 off
+	  GPIO_SetBits(GPIOB, GPIO_Pin_5);
 	}
 
   }
@@ -1047,6 +1052,11 @@ PARAM_ADD(PARAM_UINT16, baseThrust, &altHoldBaseThrust)
 PARAM_ADD(PARAM_UINT16, maxThrust, &altHoldMaxThrust)
 PARAM_ADD(PARAM_UINT16, minThrust, &altHoldMinThrust)
 PARAM_GROUP_STOP(altHold)
+
+// Params for balancing M1 and M2
+PARAM_GROUP_START(motors)
+PARAM_ADD(PARAM_FLOAT, fwdbwdscale, &scale)
+PARAM_GROUP_STOP(motors)
 
 #if defined(SITAW_ENABLED)
 // Automatic take-off parameters
