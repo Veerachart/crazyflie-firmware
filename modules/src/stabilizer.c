@@ -65,9 +65,9 @@
 #define ALTHOLD_UPDATE_RATE_DIVIDER  5 // 500hz/5 = 100hz for barometer measurements
 #define ALTHOLD_UPDATE_DT  (float)(1.0 / (IMU_UPDATE_FREQ / ALTHOLD_UPDATE_RATE_DIVIDER))   // 500hz
 
-// Magnetometer
-#define MAGNETOMETER_UPDATE_RATE_DIVIDER  25	// 20 Hz for reading
-#define MAGNETOMETER_FUSION_RATE_DIVIDER  100	// 5 Hz for fusion with gyroscope (4-sample averaging)
+//// Magnetometer
+//#define MAGNETOMETER_UPDATE_RATE_DIVIDER  25	// 20 Hz for reading
+//#define MAGNETOMETER_FUSION_RATE_DIVIDER  100	// 5 Hz for fusion with gyroscope (4-sample averaging)
 
 // Threshold value for zero
 #define THRESHOLD 1000
@@ -129,42 +129,42 @@ static uint16_t altHoldMinThrust    = 00000; // minimum hover thrust - not used 
 static uint16_t altHoldBaseThrust   = 43000; // approximate throttle needed when in perfect hover. More weight/older battery can use a higher value
 static uint16_t altHoldMaxThrust    = 60000; // max altitude hold thrust
 
-static float bias_x					= 0.048;		// Middle value for x
-static float bias_y					= -2.310;		// Middle value for y
-static float bias_z					= 3.092;		// Middle value for z
-static float scale_x 				= 1.060;		// Scale value for x
-static float scale_y 				= 1.017;		// Scale value for y
-static float scale_z 				= 0.931;		// Scale value for z
-static float heading 				= 0;					// Magnetic heading
-static float bias_m1x				= -0.085;				// Effect from relay when M1 is negative - x
-static float bias_m1y				= 0.045;				// Effect from relay when M1 is negative - y
-static float bias_m1z				= 0.010;				// Effect from relay when M1 is negative - z
-static float bias_m2x				= 0.965;				// Effect from relay when M2 is negative - x
-static float bias_m2y				= 0.085;				// Effect from relay when M2 is negative - y
-static float bias_m2z				= -0.105;				// Effect from relay when M2 is negative - z
-static float bias_bothx				= 0.885;				// Effect from relay when M1&2 are negative - x
-static float bias_bothy				= 0.120;				// Effect from relay when M1&2 are negative - y
-static float bias_bothz				= -0.085;				// Effect from relay when M1&2 are negative - z
-static float mag_x_calib = 0;
-static float mag_y_calib = 0;
-static float mag_z_calib = 0;
-static float mag_x_calib_old;
-static float mag_y_calib_old;
-static float mag_z_calib_old;
-static float mag_x_calib_previous;
-static float mag_y_calib_previous;
-static float mag_z_calib_previous;
-static float mag_x_accum;
-static float mag_y_accum;
-static float mag_z_accum;
-static float mag_x;
-static float mag_y;
-static float mag_z;
-static int mag_counter;
-static int heading_calibrate = 0;
-static bool isHeadingCalibrated = false;
-static float heading_zero;
-static bool updateMagneticHeading = false;
+//static float bias_x					= 0.048;		// Middle value for x
+//static float bias_y					= -2.310;		// Middle value for y
+//static float bias_z					= 3.092;		// Middle value for z
+//static float scale_x 				= 1.060;		// Scale value for x
+//static float scale_y 				= 1.017;		// Scale value for y
+//static float scale_z 				= 0.931;		// Scale value for z
+//static float heading 				= 0;					// Magnetic heading
+//static float bias_m1x				= -0.085;				// Effect from relay when M1 is negative - x
+//static float bias_m1y				= 0.045;				// Effect from relay when M1 is negative - y
+//static float bias_m1z				= 0.010;				// Effect from relay when M1 is negative - z
+//static float bias_m2x				= 0.965;				// Effect from relay when M2 is negative - x
+//static float bias_m2y				= 0.085;				// Effect from relay when M2 is negative - y
+//static float bias_m2z				= -0.105;				// Effect from relay when M2 is negative - z
+//static float bias_bothx				= 0.885;				// Effect from relay when M1&2 are negative - x
+//static float bias_bothy				= 0.120;				// Effect from relay when M1&2 are negative - y
+//static float bias_bothz				= -0.085;				// Effect from relay when M1&2 are negative - z
+//static float mag_x_calib = 0;
+//static float mag_y_calib = 0;
+//static float mag_z_calib = 0;
+//static float mag_x_calib_old;
+//static float mag_y_calib_old;
+//static float mag_z_calib_old;
+//static float mag_x_calib_previous;
+//static float mag_y_calib_previous;
+//static float mag_z_calib_previous;
+//static float mag_x_accum;
+//static float mag_y_accum;
+//static float mag_z_accum;
+//static float mag_x;
+//static float mag_y;
+//static float mag_z;
+//static int mag_counter;
+//static int heading_calibrate = 0;
+//static bool isHeadingCalibrated = false;
+//static float heading_zero;
+//static bool updateMagneticHeading = false;
 
 static float scale = 1.1;
 
@@ -206,10 +206,13 @@ static void stabilizerRotateYawCarefree(bool reset);
 static void stabilizerYawModeUpdate(void);
 static void distributePower(const int32_t thrust, const int16_t roll,
                             const int32_t pitch, const int16_t yaw);
+static void sendMotorPower(void);
 static int32_t limitThrust(int32_t value);
 static void stabilizerTask(void* param);
 static float constrain(float value, const float minVal, const float maxVal);
 static float deadband(float value, const float threshold);
+
+//static void testRelays(uint32_t ticks);
 
 void stabilizerInit(void)
 {
@@ -301,11 +304,9 @@ static void stabilizerTask(void* param)
   RPYType yawType;
   uint32_t attitudeCounter = 0;
   uint32_t altHoldCounter = 0;
-  uint32_t magnetometerCounter = 0;
   uint32_t lastWakeTime;
+//  uint32_t tickCounter = 0;
   float yawRateAngle = 0;
-  float Bx = 0;
-  float By = 0;
 
   vTaskSetApplicationTaskTag(0, (void*)TASK_STABILIZER_ID_NBR);
 
@@ -317,6 +318,7 @@ static void stabilizerTask(void* param)
   while(1)
   {
     vTaskDelayUntil(&lastWakeTime, F2T(IMU_UPDATE_FREQ)); // 500Hz
+    sendMotorPower();
 
     // Magnetometer not yet used more then for logging.
     imu9Read(&gyro, &acc, &mag);
@@ -340,9 +342,7 @@ static void stabilizerTask(void* param)
       // 250HZ
       if (++attitudeCounter >= ATTITUDE_UPDATE_RATE_DIVIDER)
       {
-        sensfusion6UpdateQ(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, FUSION_UPDATE_DT, mag_x, mag_y, mag_z, false);
-        if (updateMagneticHeading)
-        	updateMagneticHeading = false;
+        sensfusion6UpdateQ(gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z, FUSION_UPDATE_DT);
         sensfusion6GetEulerRPY(&eulerRollActual, &eulerPitchActual, &eulerYawActual);
 
         accWZ = sensfusion6GetAccZWithoutGravity(acc.x, acc.y, acc.z);
@@ -410,111 +410,111 @@ static void stabilizerTask(void* param)
       }
 
       // 20 Hz
-      if (++magnetometerCounter % MAGNETOMETER_UPDATE_RATE_DIVIDER == 0) {
-    	  mag_x_calib = scale_x*(mag.x-bias_x);
-		  mag_y_calib = scale_y*(mag.y-bias_y);
-		  mag_z_calib = scale_z*(mag.z-bias_z);
-
-		  if (motorPowerM1_old < 0 && motorPowerM2_old >= 0) {
-			  mag_x_calib -= bias_m1x;
-			  mag_y_calib -= bias_m1y;
-			  mag_z_calib -= bias_m1z;
-		  }
-		  else if (motorPowerM2_old < 0 && motorPowerM1_old >= 0) {
-			  mag_x_calib -= bias_m2x;
-			  mag_y_calib -= bias_m2y;
-			  mag_z_calib -= bias_m2z;
-		  }
-		  else if (motorPowerM2_old < 0 && motorPowerM1_old < 0) {
-			  mag_x_calib -= bias_bothx;
-			  mag_y_calib -= bias_bothy;
-			  mag_z_calib -= bias_bothz;
-		  }
-
-		  // Change axis to match magnetometer with gyroscope
-		  float temp = mag_x_calib;
-		  mag_x_calib = mag_y_calib;
-		  mag_y_calib = temp;
-		  mag_z_calib = -mag_z_calib;
-
-		  if ((fabsf(mag_x_calib - mag_x_calib_old) <= 0.05 && fabsf(mag_y_calib - mag_y_calib_old) <= 0.05 && fabsf(mag_z_calib - mag_z_calib_old) <= 0.05) ||
-				  ((mag_x_calib_old == 0 && mag_y_calib_old == 0 && mag_z_calib_old == 0) && ((mag_x_calib_previous == 0 && mag_y_calib_previous == 0 && mag_z_calib_previous == 0) ||
-				  (fabsf(mag_x_calib - mag_x_calib_previous) <= 0.05 && fabsf(mag_y_calib - mag_y_calib_previous) <= 0.05 && fabsf(mag_z_calib - mag_z_calib_previous) <= 0.05)))) {
-//		  if (1) {
-			  // The value does not jumps too far
-			  // (Relay triggers cause jumps in magnetic field and result in wrong heading)
-			  mag_x_accum += mag_x_calib;
-			  mag_y_accum += mag_y_calib;
-			  mag_z_accum += mag_z_calib;
-			  mag_counter++;
-			  mag_x_calib_old = mag_x_calib;
-			  mag_y_calib_old = mag_y_calib;
-			  mag_z_calib_old = mag_z_calib;
-		  }
-
-		  if (magnetometerCounter == MAGNETOMETER_FUSION_RATE_DIVIDER) {		// 5 Hz
-			  if (mag_counter){
-				  mag_x = (float) mag_x_accum/mag_counter;
-				  mag_y = (float) mag_y_accum/mag_counter;
-				  mag_z = (float) mag_z_accum/mag_counter;
-				  Bx = mag_x*cosf(eulerPitchActual*(float)M_PI / 180) + mag_y*sinf(eulerPitchActual*(float)M_PI / 180)*sinf(eulerRollActual*(float)M_PI / 180) + mag_z*sinf(eulerPitchActual*(float)M_PI / 180)*cosf(eulerRollActual*(float)M_PI / 180);
-				  By = mag_y*cosf(eulerRollActual*(float)M_PI / 180) + mag_z*sinf(eulerRollActual*(float)M_PI / 180);
-				  heading = atan2f(By, Bx)*(float)180 / M_PI;
-				  if (isHeadingCalibrated) {
-//					  heading -= heading_zero;
-//					  if (heading < -180.0f) {
-//						  heading += 360.0f;
+//      if (++magnetometerCounter % MAGNETOMETER_UPDATE_RATE_DIVIDER == 0) {
+//    	  mag_x_calib = scale_x*(mag.x-bias_x);
+//		  mag_y_calib = scale_y*(mag.y-bias_y);
+//		  mag_z_calib = scale_z*(mag.z-bias_z);
+//
+//		  if (motorPowerM1_old < 0 && motorPowerM2_old >= 0) {
+//			  mag_x_calib -= bias_m1x;
+//			  mag_y_calib -= bias_m1y;
+//			  mag_z_calib -= bias_m1z;
+//		  }
+//		  else if (motorPowerM2_old < 0 && motorPowerM1_old >= 0) {
+//			  mag_x_calib -= bias_m2x;
+//			  mag_y_calib -= bias_m2y;
+//			  mag_z_calib -= bias_m2z;
+//		  }
+//		  else if (motorPowerM2_old < 0 && motorPowerM1_old < 0) {
+//			  mag_x_calib -= bias_bothx;
+//			  mag_y_calib -= bias_bothy;
+//			  mag_z_calib -= bias_bothz;
+//		  }
+//
+//		  // Change axis to match magnetometer with gyroscope
+//		  float temp = mag_x_calib;
+//		  mag_x_calib = mag_y_calib;
+//		  mag_y_calib = temp;
+//		  mag_z_calib = -mag_z_calib;
+//
+//		  if ((fabsf(mag_x_calib - mag_x_calib_old) <= 0.05 && fabsf(mag_y_calib - mag_y_calib_old) <= 0.05 && fabsf(mag_z_calib - mag_z_calib_old) <= 0.05) ||
+//				  ((mag_x_calib_old == 0 && mag_y_calib_old == 0 && mag_z_calib_old == 0) && ((mag_x_calib_previous == 0 && mag_y_calib_previous == 0 && mag_z_calib_previous == 0) ||
+//				  (fabsf(mag_x_calib - mag_x_calib_previous) <= 0.05 && fabsf(mag_y_calib - mag_y_calib_previous) <= 0.05 && fabsf(mag_z_calib - mag_z_calib_previous) <= 0.05)))) {
+////		  if (1) {
+//			  // The value does not jumps too far
+//			  // (Relay triggers cause jumps in magnetic field and result in wrong heading)
+//			  mag_x_accum += mag_x_calib;
+//			  mag_y_accum += mag_y_calib;
+//			  mag_z_accum += mag_z_calib;
+//			  mag_counter++;
+//			  mag_x_calib_old = mag_x_calib;
+//			  mag_y_calib_old = mag_y_calib;
+//			  mag_z_calib_old = mag_z_calib;
+//		  }
+//
+//		  if (magnetometerCounter == MAGNETOMETER_FUSION_RATE_DIVIDER) {		// 5 Hz
+//			  if (mag_counter){
+//				  mag_x = (float) mag_x_accum/mag_counter;
+//				  mag_y = (float) mag_y_accum/mag_counter;
+//				  mag_z = (float) mag_z_accum/mag_counter;
+//				  Bx = mag_x*cosf(eulerPitchActual*(float)M_PI / 180) + mag_y*sinf(eulerPitchActual*(float)M_PI / 180)*sinf(eulerRollActual*(float)M_PI / 180) + mag_z*sinf(eulerPitchActual*(float)M_PI / 180)*cosf(eulerRollActual*(float)M_PI / 180);
+//				  By = mag_y*cosf(eulerRollActual*(float)M_PI / 180) + mag_z*sinf(eulerRollActual*(float)M_PI / 180);
+//				  heading = atan2f(By, Bx)*(float)180 / M_PI;
+//				  if (isHeadingCalibrated) {
+////					  heading -= heading_zero;
+////					  if (heading < -180.0f) {
+////						  heading += 360.0f;
+////					  }
+////					  else if (heading > 180.0f) {
+////						  heading -= 360.0f;
+////					  }
+////					  float diff = heading - eulerYawActual;
+////					  if (diff > 180.0f)
+////						  diff -= 360.0f;
+////					  else if (diff < -180.0f)
+////						  diff += 360.0f;
+////					  sensfusion6DriftCorrect(diff*0.1f);
+//					  updateMagneticHeading = true;
+//				  }
+//				  else {
+//					  heading_zero += heading;
+////					  DEBUG_PRINT("Yes: %.3f, %.3f, %.3f, %.3f\n", mag_x, mag_y, mag_z, heading);
+//					  if (++heading_calibrate >= 10) {
+//						  heading_zero = (float) heading_zero/heading_calibrate;
+//						  isHeadingCalibrated = true;
+//						  DEBUG_PRINT("Calibrated: %.3f\n", heading_zero);
+//						  heading_x = cosf(heading_zero*M_PI/180.0);
+//						  heading_y = sinf(heading_zero*M_PI/180.0);
 //					  }
-//					  else if (heading > 180.0f) {
-//						  heading -= 360.0f;
-//					  }
-//					  float diff = heading - eulerYawActual;
-//					  if (diff > 180.0f)
-//						  diff -= 360.0f;
-//					  else if (diff < -180.0f)
-//						  diff += 360.0f;
-//					  sensfusion6DriftCorrect(diff*0.1f);
-					  updateMagneticHeading = true;
-				  }
-				  else {
-					  heading_zero += heading;
-//					  DEBUG_PRINT("Yes: %.3f, %.3f, %.3f, %.3f\n", mag_x, mag_y, mag_z, heading);
-					  if (++heading_calibrate >= 10) {
-						  heading_zero = (float) heading_zero/heading_calibrate;
-						  isHeadingCalibrated = true;
-						  DEBUG_PRINT("Calibrated: %.3f\n", heading_zero);
-						  heading_x = cosf(heading_zero*M_PI/180.0);
-						  heading_y = sinf(heading_zero*M_PI/180.0);
-					  }
-				  }
-				  mag_counter = 0;
-				  mag_x_accum = 0;
-				  mag_y_accum = 0;
-				  mag_z_accum = 0;
-				  mag_x_calib_previous = mag_x;
-				  mag_y_calib_previous = mag_y;
-				  mag_z_calib_previous = mag_z;
-			  }
-			  else {
-				  if (mag_x_calib_old == 0 && mag_y_calib_old == 0 && mag_z_calib_old == 0) {
-					  mag_x_calib_previous = 0;
-					  mag_y_calib_previous = 0;
-					  mag_z_calib_previous = 0;
-				  }
-				  else {
-					  mag_x_calib_old = 0;
-					  mag_y_calib_old = 0;
-					  mag_z_calib_old = 0;
-				  }
-				  if (!isHeadingCalibrated) {
-					  heading_calibrate = 0;		// Reset zero heading calibration
-					  heading_zero = 0;
-//				  	  DEBUG_PRINT("No;  %.3f, %.3f, %.3f, %.3f\n", mag_x, mag_y, mag_z, heading);
-				  }
-			  }
-			  magnetometerCounter = 0;
-		  }
-      }
+//				  }
+//				  mag_counter = 0;
+//				  mag_x_accum = 0;
+//				  mag_y_accum = 0;
+//				  mag_z_accum = 0;
+//				  mag_x_calib_previous = mag_x;
+//				  mag_y_calib_previous = mag_y;
+//				  mag_z_calib_previous = mag_z;
+//			  }
+//			  else {
+//				  if (mag_x_calib_old == 0 && mag_y_calib_old == 0 && mag_z_calib_old == 0) {
+//					  mag_x_calib_previous = 0;
+//					  mag_y_calib_previous = 0;
+//					  mag_z_calib_previous = 0;
+//				  }
+//				  else {
+//					  mag_x_calib_old = 0;
+//					  mag_y_calib_old = 0;
+//					  mag_z_calib_old = 0;
+//				  }
+//				  if (!isHeadingCalibrated) {
+//					  heading_calibrate = 0;		// Reset zero heading calibration
+//					  heading_zero = 0;
+////				  	  DEBUG_PRINT("No;  %.3f, %.3f, %.3f, %.3f\n", mag_x, mag_y, mag_z, heading);
+//				  }
+//			  }
+//			  magnetometerCounter = 0;
+//		  }
+//      }
 
       if (rollType == RATE)
       {
@@ -546,6 +546,7 @@ static void stabilizerTask(void* param)
       stabilizerPreThrustUpdateCallOut();
 
       if (actuatorThrust != 0 || actuatorYaw != 0 || eulerPitchDesired != 0){		// No input command, so no drive
+//      if (true) {
 #if defined(TUNE_ROLL)
         distributePower(actuatorThrust, actuatorRoll, 0, 0);
 #elif defined(TUNE_PITCH)
@@ -554,6 +555,10 @@ static void stabilizerTask(void* param)
         distributePower(actuatorThrust, 0, 0, -actuatorYaw);
 #else
         distributePower(actuatorThrust, actuatorRoll, (int32_t) -(eulerPitchDesired*600), actuatorYaw);
+//        testRelays(tickCounter);
+//        tickCounter++;
+//        if (tickCounter == 2001)
+//        	tickCounter = 1;
 #endif
       }
       else
@@ -857,7 +862,7 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 
   if ((motorPowerM1 >= 0) != (motorPowerM1_old >= 0)){
 	// Different sign ==> trigger the relay
-	motorsSetRatio(MOTOR_M1, 0);				// Stop motor first
+	//motorsSetRatio(MOTOR_M1, 0);				// Stop motor first
 	//vTaskDelay(M2T(1));						// 1 ms for stopping
 	if (motorPowerM1 >= 0){
 	  // Reset -- IO3 off IO4 on
@@ -872,7 +877,7 @@ static void distributePower(const int32_t thrust, const int16_t roll,
   }
   if ((motorPowerM2 >= 0) != (motorPowerM2_old >= 0)){
 	// Different sign ==> trigger the relay
-	motorsSetRatio(MOTOR_M2, 0);				// Stop motor first
+	//motorsSetRatio(MOTOR_M2, 0);				// Stop motor first
 	//vTaskDelay(M2T(1));						// 1 ms for stopping
 	if (motorPowerM2 >= 0){
 	  // Reset -- IO1 off IO2 on
@@ -884,16 +889,16 @@ static void distributePower(const int32_t thrust, const int16_t roll,
 	}
 
   }
-  if (((motorPowerM1 >= 0) != (motorPowerM1_old >= 0)) || ((motorPowerM2 >= 0) != (motorPowerM2_old >= 0))){
-	  vTaskDelay(M2T(2));						// 1 ms for triggering relay
-  }
-  GPIO_ResetBits(GPIOB, GPIO_Pin_8);
-  GPIO_ResetBits(GPIOB, GPIO_Pin_5);
-  GPIO_ResetBits(GPIOC, GPIO_Pin_12);
-  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
-
-  motorsSetRatio(MOTOR_M1, abs(motorPowerM1));
-  motorsSetRatio(MOTOR_M2, abs(motorPowerM2));
+//  if (((motorPowerM1 >= 0) != (motorPowerM1_old >= 0)) || ((motorPowerM2 >= 0) != (motorPowerM2_old >= 0))){
+//	  vTaskDelay(M2T(2));						// 1 ms for triggering relay
+//  }
+//  GPIO_ResetBits(GPIOB, GPIO_Pin_8);
+//  GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+//  GPIO_ResetBits(GPIOC, GPIO_Pin_12);
+//  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+//
+//  motorsSetRatio(MOTOR_M1, abs(motorPowerM1));
+//  motorsSetRatio(MOTOR_M2, abs(motorPowerM2));
 //  motorsSetRatio(MOTOR_M3, motorPowerM3);
 //  motorsSetRatio(MOTOR_M4, motorPowerM4);
 
@@ -902,6 +907,32 @@ static void distributePower(const int32_t thrust, const int16_t roll,
   motorLogM1 = ((float)motorPowerM1)/(300.00f);
   motorLogM2 = ((float)motorPowerM2)/(300.00f);
 }
+
+static void sendMotorPower(void)
+{
+  GPIO_ResetBits(GPIOB, GPIO_Pin_8);
+  GPIO_ResetBits(GPIOB, GPIO_Pin_5);
+  GPIO_ResetBits(GPIOC, GPIO_Pin_12);
+  GPIO_ResetBits(GPIOB, GPIO_Pin_4);
+
+  motorsSetRatio(MOTOR_M1, abs(motorPowerM1));
+  motorsSetRatio(MOTOR_M2, abs(motorPowerM2));
+}
+
+//static void testRelays(uint32_t ticks){
+//  if (ticks == 500) {
+//	  GPIO_SetBits(GPIOB, GPIO_Pin_4);
+//  }
+//  else if (ticks == 1000) {
+//	  GPIO_SetBits(GPIOC, GPIO_Pin_12);
+//  }
+//  else if (ticks == 1500) {
+//	  GPIO_SetBits(GPIOB, GPIO_Pin_5);
+//  }
+//  else if (ticks == 2000) {
+//	  GPIO_SetBits(GPIOB, GPIO_Pin_8);
+//  }
+//}
 
 static int32_t limitThrust(int32_t value)
 {
@@ -973,21 +1004,20 @@ LOG_GROUP_START(mag)
 LOG_ADD(LOG_FLOAT, x, &mag.x)
 LOG_ADD(LOG_FLOAT, y, &mag.y)
 LOG_ADD(LOG_FLOAT, z, &mag.z)
-LOG_ADD(LOG_FLOAT, heading, &heading)
 LOG_GROUP_STOP(mag)
 
-LOG_GROUP_START(magold)
-LOG_ADD(LOG_FLOAT, x, &mag_x_calib_old)
-LOG_ADD(LOG_FLOAT, y, &mag_y_calib_old)
-LOG_ADD(LOG_FLOAT, z, &mag_z_calib_old)
-LOG_GROUP_STOP(magold)
-
-LOG_GROUP_START(magcalib)
-LOG_ADD(LOG_FLOAT, x, &mag_x)
-LOG_ADD(LOG_FLOAT, y, &mag_y)
-LOG_ADD(LOG_FLOAT, z, &mag_z)
-LOG_ADD(LOG_FLOAT, heading, &heading)
-LOG_GROUP_STOP(magcalib)
+//LOG_GROUP_START(magold)
+//LOG_ADD(LOG_FLOAT, x, &mag_x_calib_old)
+//LOG_ADD(LOG_FLOAT, y, &mag_y_calib_old)
+//LOG_ADD(LOG_FLOAT, z, &mag_z_calib_old)
+//LOG_GROUP_STOP(magold)
+//
+//LOG_GROUP_START(magcalib)
+//LOG_ADD(LOG_FLOAT, x, &mag_x)
+//LOG_ADD(LOG_FLOAT, y, &mag_y)
+//LOG_ADD(LOG_FLOAT, z, &mag_z)
+//LOG_ADD(LOG_FLOAT, heading, &heading)
+//LOG_GROUP_STOP(magcalib)
 
 LOG_GROUP_START(motor)
 LOG_ADD(LOG_FLOAT, m1, &motorLogM1)

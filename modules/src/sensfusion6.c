@@ -160,7 +160,7 @@ void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float 
 // Date     Author      Notes
 // 29/09/2011 SOH Madgwick    Initial release
 // 02/10/2011 SOH Madgwick  Optimised for reduced CPU load
-void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float az, float dt, float bx, float by, float bz, bool update_mag)
+void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float az, float dt)
 {
   float recipNorm;
   float halfvx, halfvy, halfvz;
@@ -193,21 +193,7 @@ void sensfusion6UpdateQ(float gx, float gy, float gz, float ax, float ay, float 
     halfez = (ax * halfvy - ay * halfvx);
   }
 
-  if(update_mag)
-  {
-	m_x = bx*(q0*q0 + q1*q1 - 0.5) + by*(q1*q2 - q0*q3) + bz*(q1*q3 + q0*q2);
-	m_y = bx*(q1*q2 + q0*q3) + by*(q0*q0 + q2*q2 - 0.5) + bz*(q2*q3 - q0*q1);
-	recipNorm = invSqrt(m_x*m_x + m_y*m_y);
-	m_x *= recipNorm;
-	m_y *= recipNorm;
-
-	e_mag = m_x*heading_y - m_y*heading_x;
-	halfex += e_mag*halfvx;
-	halfey += e_mag*halfvy;
-	halfez += e_mag*halfvz;
-  }
-
-  if(!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f)) || update_mag)
+  if(!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f)))
   {
     // Compute and apply integral feedback if enabled
     if(twoKi > 0.0f)
